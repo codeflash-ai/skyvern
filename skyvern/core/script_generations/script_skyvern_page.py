@@ -7,13 +7,14 @@ import structlog
 from playwright.async_api import Page
 
 from skyvern.config import settings
-from skyvern.core.script_generations.real_skyvern_page_ai import RealSkyvernPageAi
+from skyvern.core.script_generations.real_skyvern_page_ai import RealSkyvernPageAi, render_template
 from skyvern.core.script_generations.skyvern_page import ActionCall, ActionMetadata, RunContext, SkyvernPage
 from skyvern.exceptions import ScriptTerminationException, WorkflowRunNotFound
 from skyvern.forge import app
 from skyvern.forge.prompts import prompt_engine
 from skyvern.forge.sdk.artifact.models import ArtifactType
 from skyvern.forge.sdk.core import skyvern_context
+from skyvern.utils.url_validators import prepend_scheme_and_validate_url
 from skyvern.webeye.actions.action_types import ActionType
 from skyvern.webeye.actions.actions import (
     Action,
@@ -392,6 +393,23 @@ class ScriptSkyvernPage(SkyvernPage):
         except Exception:
             # If screenshot creation fails, don't block execution
             pass
+
+    async def goto(self, url: str, timeout: float = settings.BROWSER_LOADING_TIMEOUT_MS) -> None:
+        url = render_template(url)
+        url = prepend_scheme_and_validate_url(url)
+
+        # Print navigation in script mode
+        context = skyvern_context.current()
+        if context and context.script_mode:
+            print(f"🌐 Navigating to: {url}")
+
+        await self.page.goto(
+            url,
+            timeout=timeout,
+        )
+
+        if context and context.script_mode:
+            print("  ✓ Page loaded")
 
     @action_wrap(ActionType.SOLVE_CAPTCHA)
     async def solve_captcha(
