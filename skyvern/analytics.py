@@ -46,6 +46,7 @@ def capture(
 
     payload: dict[str, Any] = data or {}
     try:
+        from skyvern.analytics import posthog
         posthog.capture(distinct_id=distinct_id, event=event, properties=payload)
     except Exception as e:
         payload.update(
@@ -53,6 +54,7 @@ def capture(
                 "capture_error": str(e),
             }
         )
+        from skyvern.analytics import posthog
         posthog.capture(
             distinct_id=distinct_id,
             event="failure",
