@@ -100,7 +100,10 @@ class AsyncOperationPool:
         return [aio_task for aio_task in self._aio_tasks.get(task_id, {}).values() if is_aio_task_running(aio_task)]
 
     def get_aio_task(self, task_id: str, operation_type: str) -> asyncio.Task | None:
-        return self._aio_tasks.get(task_id, {}).get(operation_type, None)
+        task_map = self._aio_tasks.get(task_id)
+        if task_map is not None:
+            return task_map.get(operation_type)
+        return None
 
     def _remove_aio_tasks(self, task_id: str) -> None:
         if task_id in self._aio_tasks:
