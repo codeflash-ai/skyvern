@@ -11,7 +11,16 @@ from .console import console
 
 
 def command_exists(command: str) -> bool:
-    return shutil.which(command) is not None
+    cache = getattr(command_exists, '_cache', None)
+    if cache is None:
+        cache = {}
+        setattr(command_exists, '_cache', cache)
+    if command in cache:
+        return cache[command]
+    
+    result = shutil.which(command) is not None
+    cache[command] = result
+    return result
 
 
 def run_command(command: str, check: bool = True) -> tuple[Optional[str], Optional[int]]:
