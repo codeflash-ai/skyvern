@@ -17,8 +17,7 @@ def get_default_chrome_location(host_system: str) -> str:
     if host_system == "darwin":
         return "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
     if host_system == "linux":
-        chrome_paths = ["/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser"]
-        for path in chrome_paths:
+        for path in ("/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser"):
             if os.path.exists(path):
                 return path
         return "/usr/bin/google-chrome"
