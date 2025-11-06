@@ -79,8 +79,13 @@ class AsyncOperationPool:
         if task_id in self._operations:
             # already exists
             return
+        # Batch create per-task phase->op dict to populate in one go
+        op_dict = {}
         for operation in operations:
-            self._add_operation(task_id, operation)
+            if operation.agent_phase not in VALID_AGENT_PHASES:
+                raise ValueError(f"operation's agent phase {operation.agent_phase} is not valid")
+            op_dict[operation.agent_phase] = operation
+        self._operations[task_id] = op_dict
 
     def _get_operation(self, task_id: str, agent_phase: AgentPhase) -> AsyncOperation | None:
         # Direct dictionary access and exception handling to minimize overhead
