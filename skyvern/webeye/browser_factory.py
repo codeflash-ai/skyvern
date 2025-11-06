@@ -38,6 +38,8 @@ from skyvern.forge.sdk.core.skyvern_context import current, ensure_context
 from skyvern.schemas.runs import ProxyLocation, get_tzinfo_from_proxy
 from skyvern.webeye.utils.page import ScreenshotMode, SkyvernFrame
 
+PROXY_PATTERN = re.compile(r"^(http|https|socks5):\/\/([^:@]+(:[^@]*)?@)?[^\s:\/]+(:\d+)?$")
+
 LOG = structlog.get_logger()
 
 
@@ -361,12 +363,19 @@ def setup_proxy() -> dict | None:
 
 
 def _is_valid_proxy_url(url: str) -> bool:
-    PROXY_PATTERN = re.compile(r"^(http|https|socks5):\/\/([^:@]+(:[^@]*)?@)?[^\s:\/]+(:\d+)?$")
     try:
+        # Avoid unnecessary parsing if the basic regex doesn't even match
+        match = PROXY_PATTERN.match(url)
+        if not match:
+            return False
+
         parsed = urlparse(url)
         if not parsed.scheme or not parsed.netloc:
             return False
-        return bool(PROXY_PATTERN.match(url))
+
+        # The regex match already guarantees the scheme, netloc, and structure.
+        # Retain second check as per original logic.
+        return True
     except Exception:
         return False
 
