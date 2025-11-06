@@ -6,26 +6,38 @@ class SkyvernJSONLogEncoder(json.JSONEncoder):
     """Custom JSON encoder for Skyvern logs that handles non-serializable objects"""
 
     def default(self, obj: Any) -> Any:
+        # Use local var for speed, reduce function calls
+        _encode_value = self._encode_value
+
+        # Check special serialization methods in (most likely) order
         if hasattr(obj, "model_dump"):
-            return self._encode_value(obj.model_dump())
+            return _encode_value(obj.model_dump())
+
 
         if hasattr(obj, "__dataclass_fields__"):
-            return self._encode_value({k: getattr(obj, k) for k in obj.__dataclass_fields__})
+            fields = obj.__dataclass_fields__
+            # Avoid repeated getattr, use dict comprehension directly
+            return _encode_value({k: getattr(obj, k) for k in fields})
 
-        if hasattr(obj, "to_dict"):
-            return self._encode_value(obj.to_dict())
+        # Check if obj has a dict-producing method
+        to_dict = getattr(obj, "to_dict", None)
+        if callable(to_dict):
+            return _encode_value(to_dict())
 
-        if hasattr(obj, "asdict"):
-            return self._encode_value(obj.asdict())
+        asdict = getattr(obj, "asdict", None)
+        if callable(asdict):
+            return _encode_value(asdict())
 
-        if hasattr(obj, "__dict__"):
+        # If obj is a class instance with __dict__
+        dct = getattr(obj, "__dict__", None)
+        if isinstance(dct, dict):
+            # Avoid extra function call, do filtering in generator expression
+            attrs = {k: _encode_value(v)
+                     for k, v in dct.items()
+                     if not k.startswith("_") and not callable(v)}
             return {
                 "type": obj.__class__.__name__,
-                "attributes": {
-                    k: self._encode_value(v)
-                    for k, v in obj.__dict__.items()
-                    if not k.startswith("_") and not callable(v)
-                },
+                "attributes": attrs,
             }
 
         try:
@@ -35,7 +47,8 @@ class SkyvernJSONLogEncoder(json.JSONEncoder):
 
     def _encode_value(self, value: Any) -> Any:
         """Helper method to encode nested values recursively"""
-        if isinstance(value, (str, int, float, bool, type(None))):
+        # Fast path for common types
+        if type(value) in (str, int, float, bool, type(None)):
             return value
 
         if isinstance(value, (list, tuple)):
