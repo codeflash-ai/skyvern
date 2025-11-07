@@ -176,7 +176,7 @@ def add_streaming_client(streaming: "Streaming") -> None:
 
 
 def get_streaming_client(client_id: str) -> t.Union["Streaming", None]:
-    return streaming_clients.get(client_id, None)
+    return streaming_clients.get(client_id)
 
 
 def del_streaming_client(client_id: str) -> None:
