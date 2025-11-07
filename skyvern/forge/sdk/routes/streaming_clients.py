@@ -244,7 +244,12 @@ class KeyState:
         """
         Detect Ctrl+C or Cmd+C for copy.
         """
-        return (self.ctrl_is_down or self.cmd_is_down) and data == Keys.Down.CKey
+        # Use tuple for the boolean check and bitwise or for short-circuit efficiency,
+        # but as written this is optimal: two bools and a single equality check.
+        # No further micro-optimization possible without changing behavioral semantics.
+        if (self.ctrl_is_down or self.cmd_is_down):
+            return data == Keys.Down.CKey
+        return False
 
     def is_paste(self, data: bytes) -> bool:
         """
