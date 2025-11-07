@@ -250,7 +250,12 @@ class KeyState:
         """
         Detect Ctrl+V or Cmd+V for paste.
         """
-        return (self.ctrl_is_down or self.cmd_is_down) and data == Keys.Down.VKey
+        # Avoid tuple or list; directly use bool ops for faster branch resolution
+        # micro-optimization: reduce attribute lookups to one branch block
+        if self.ctrl_is_down or self.cmd_is_down:
+            # 'data == Keys.Down.VKey' is the only comparison needed
+            return data == Keys.Down.VKey
+        return False
 
 
 @dataclasses.dataclass
