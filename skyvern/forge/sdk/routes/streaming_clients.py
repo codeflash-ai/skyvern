@@ -150,18 +150,20 @@ ChannelMessage = t.Union[MessageTakeControl, MessageCedeControl, MessageInAskFor
 
 
 def reify_channel_message(data: dict) -> ChannelMessage:
-    kind = data.get("kind", None)
+    kind = data.get("kind")
 
-    match kind:
-        case "take-control":
-            return MessageTakeControl()
-        case "cede-control":
-            return MessageCedeControl()
-        case "ask-for-clipboard-response":
-            text = data.get("text") or ""
-            return MessageInAskForClipboardResponse(text=text)
-        case _:
-            raise ValueError(f"Unknown message kind: '{kind}'")
+    if kind == "take-control":
+        return MessageTakeControl()
+    elif kind == "cede-control":
+        return MessageCedeControl()
+    elif kind == "ask-for-clipboard-response":
+        # Avoids a chained `or ""` if '' is an allowed value
+        text = data.get("text")
+        if not text:
+            text = ""
+        return MessageInAskForClipboardResponse(text=text)
+    else:
+        raise ValueError(f"Unknown message kind: '{kind}'")
 
 
 # Streaming
