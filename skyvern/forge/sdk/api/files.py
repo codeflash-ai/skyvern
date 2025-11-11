@@ -20,6 +20,10 @@ from skyvern.exceptions import DownloadFileMaxSizeExceeded, DownloadFileMaxWaiti
 from skyvern.forge.sdk.api.aws import AsyncAWSClient, aws_client
 from skyvern.utils.url_validators import encode_url
 
+_DOWNLOADS_BASE_DIR = f"{REPO_ROOT_DIR}/downloads"
+
+os.makedirs(_DOWNLOADS_BASE_DIR, exist_ok=True)
+
 LOG = structlog.get_logger()
 
 
@@ -178,8 +182,9 @@ def get_path_for_workflow_download_directory(run_id: str | None) -> Path:
 
 
 def get_download_dir(run_id: str | None) -> str:
-    download_dir = f"{REPO_ROOT_DIR}/downloads/{run_id}"
-    os.makedirs(download_dir, exist_ok=True)
+    download_dir = f"{_DOWNLOADS_BASE_DIR}/{run_id}"
+    if not os.path.exists(download_dir):
+        os.makedirs(download_dir, exist_ok=True)
     return download_dir
 
 
