@@ -3,9 +3,14 @@
 # nopycln: file
 import datetime as dt
 from collections import defaultdict
-from typing import Any, Callable, ClassVar, Dict, List, Mapping, Optional, Set, Tuple, Type, TypeVar, Union, cast
+from functools import lru_cache
+from typing import (Any, Callable, ClassVar, Dict, List, Mapping, Optional,
+                    Set, Tuple, Type, TypeVar, Union, cast)
 
 import pydantic
+
+from skyvern.client.core.serialization import \
+    convert_and_respect_annotation_metadata
 
 IS_PYDANTIC_V2 = pydantic.VERSION.startswith("2.")
 
@@ -13,7 +18,8 @@ if IS_PYDANTIC_V2:
     from pydantic.v1.datetime_parse import parse_date as parse_date
     from pydantic.v1.datetime_parse import parse_datetime as parse_datetime
     from pydantic.v1.fields import ModelField as ModelField
-    from pydantic.v1.json import ENCODERS_BY_TYPE as encoders_by_type  # type: ignore[attr-defined]
+    from pydantic.v1.json import \
+        ENCODERS_BY_TYPE as encoders_by_type  # type: ignore[attr-defined]
     from pydantic.v1.typing import get_args as get_args
     from pydantic.v1.typing import get_origin as get_origin
     from pydantic.v1.typing import is_literal_type as is_literal_type
@@ -28,9 +34,10 @@ else:
     from pydantic.typing import is_literal_type as is_literal_type  # type: ignore[no-redef]
     from pydantic.typing import is_union as is_union  # type: ignore[no-redef]
 
+from typing_extensions import TypeAlias
+
 from .datetime_utils import serialize_datetime
 from .serialization import convert_and_respect_annotation_metadata
-from typing_extensions import TypeAlias
 
 T = TypeVar("T")
 Model = TypeVar("Model", bound=pydantic.BaseModel)
@@ -39,7 +46,7 @@ Model = TypeVar("Model", bound=pydantic.BaseModel)
 def parse_obj_as(type_: Type[T], object_: Any) -> T:
     dealiased_object = convert_and_respect_annotation_metadata(object_=object_, annotation=type_, direction="read")
     if IS_PYDANTIC_V2:
-        adapter = pydantic.TypeAdapter(type_)  # type: ignore[attr-defined]
+        adapter = _get_type_adapter(type_)
         return adapter.validate_python(dealiased_object)
     return pydantic.parse_obj_as(type_, dealiased_object)
 
@@ -256,3 +263,7 @@ def _get_field_default(field: PydanticField) -> Any:
             return None
         return value
     return value
+
+@lru_cache(maxsize=64)
+def _get_type_adapter(type_: Any):
+    return pydantic.TypeAdapter(type_)  # type: ignore[attr-defined]
