@@ -50,4 +50,4 @@ class SkyvernJSONLogEncoder(json.JSONEncoder):
     @classmethod
     def dumps(cls, obj: Any, **kwargs: Any) -> str:
         """Helper method to properly encode objects to JSON string"""
-        return json.dumps(obj, cls=cls, **kwargs)
+        return cls(**kwargs).encode(obj)
