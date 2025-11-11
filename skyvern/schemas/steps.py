@@ -19,7 +19,7 @@ class AgentStepOutput(BaseModel):
     errors: list[UserDefinedError] = []
 
     def __repr__(self) -> str:
-        return f"AgentStepOutput({self.model_dump()})"
+        return f"AgentStepOutput({self.__dict__})"
 
     def __str__(self) -> str:
         return self.__repr__()
