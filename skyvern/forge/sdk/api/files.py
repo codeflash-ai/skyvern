@@ -20,6 +20,8 @@ from skyvern.exceptions import DownloadFileMaxSizeExceeded, DownloadFileMaxWaiti
 from skyvern.forge.sdk.api.aws import AsyncAWSClient, aws_client
 from skyvern.utils.url_validators import encode_url
 
+_GOOGLE_DRIVE_FILE_ID_PATTERN = re.compile(r"/file/d/([a-zA-Z0-9_-]+)")
+
 LOG = structlog.get_logger()
 
 
@@ -58,7 +60,7 @@ def get_file_name_and_suffix_from_headers(headers: CIMultiDictProxy[str]) -> tup
 def extract_google_drive_file_id(url: str) -> str | None:
     """Extract file ID from Google Drive URL."""
     # Handle format: https://drive.google.com/file/d/{file_id}/view
-    match = re.search(r"/file/d/([a-zA-Z0-9_-]+)", url)
+    match = _GOOGLE_DRIVE_FILE_ID_PATTERN.search(url)
     if match:
         return match.group(1)
     return None
