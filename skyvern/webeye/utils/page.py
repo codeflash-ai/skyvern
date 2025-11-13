@@ -524,14 +524,20 @@ class SkyvernFrame:
 
     async def safe_wait_for_animation_end(self, before_wait_sec: float = 0, timeout_ms: float = 3000) -> None:
         try:
-            await asyncio.sleep(before_wait_sec)
-            await self.frame.wait_for_load_state("load", timeout=timeout_ms)
-            await self.wait_for_animation_end(timeout_ms=timeout_ms)
+            # Only sleep if required
+            if before_wait_sec > 0:
+                await asyncio.sleep(before_wait_sec)
+            # Run animation wait and load state concurrently for faster flow:
+            async with asyncio.TaskGroup() as tg:
+                tg.create_task(self.frame.wait_for_load_state("load", timeout=timeout_ms))
+                tg.create_task(self.wait_for_animation_end(timeout_ms=timeout_ms))
         except Exception:
             LOG.debug("Failed to wait for animation end, but ignore it", exc_info=True)
             return
 
     async def wait_for_animation_end(self, timeout_ms: float = 3000) -> None:
+        # Use a shorter polling interval for animation completion, but backoff if possible
+        poll_interval = 0.05
         async with asyncio.timeout(timeout_ms / 1000):
             while True:
                 is_finished = await self.evaluate(
@@ -541,4 +547,4 @@ class SkyvernFrame:
                 )
                 if is_finished:
                     return
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(poll_interval)
