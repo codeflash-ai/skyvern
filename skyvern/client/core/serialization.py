@@ -6,6 +6,7 @@ import typing
 
 import pydantic
 import typing_extensions
+from functools import lru_cache
 
 
 class FieldMetadata:
@@ -58,7 +59,12 @@ def convert_and_respect_annotation_metadata(
     if inner_type is None:
         inner_type = annotation
 
-    clean_type = _remove_annotations(inner_type)
+    clean_type = _cached_remove_annotations(inner_type)
+
+    # Cache origin for reuse
+    origin = _cached_get_origin(clean_type)
+
+    # Pydantic models
     # Pydantic models
     if (
         inspect.isclass(clean_type)
@@ -71,12 +77,12 @@ def convert_and_respect_annotation_metadata(
         return _convert_mapping(object_, clean_type, direction)
 
     if (
-        typing_extensions.get_origin(clean_type) == typing.Dict
-        or typing_extensions.get_origin(clean_type) == dict
+        origin == typing.Dict
+        or origin == dict
         or clean_type == typing.Dict
     ) and isinstance(object_, typing.Dict):
-        key_type = typing_extensions.get_args(clean_type)[0]
-        value_type = typing_extensions.get_args(clean_type)[1]
+        key_type, value_type = _cached_get_args(clean_type)
+        # Only process value_type recursively
 
         return {
             key: convert_and_respect_annotation_metadata(
@@ -91,52 +97,53 @@ def convert_and_respect_annotation_metadata(
     # If you're iterating on a string, do not bother to coerce it to a sequence.
     if not isinstance(object_, str):
         if (
-            typing_extensions.get_origin(clean_type) == typing.Set
-            or typing_extensions.get_origin(clean_type) == set
+            origin == typing.Set
+            or origin == set
             or clean_type == typing.Set
         ) and isinstance(object_, typing.Set):
-            inner_type = typing_extensions.get_args(clean_type)[0]
+            inner_elem_type = _cached_get_args(clean_type)[0]
             return {
                 convert_and_respect_annotation_metadata(
                     object_=item,
                     annotation=annotation,
-                    inner_type=inner_type,
+                    inner_type=inner_elem_type,
                     direction=direction,
                 )
                 for item in object_
             }
         elif (
             (
-                typing_extensions.get_origin(clean_type) == typing.List
-                or typing_extensions.get_origin(clean_type) == list
+                origin == typing.List
+                or origin == list
                 or clean_type == typing.List
             )
             and isinstance(object_, typing.List)
         ) or (
             (
-                typing_extensions.get_origin(clean_type) == typing.Sequence
-                or typing_extensions.get_origin(clean_type) == collections.abc.Sequence
+                origin == typing.Sequence
+                or origin == collections.abc.Sequence
                 or clean_type == typing.Sequence
             )
             and isinstance(object_, typing.Sequence)
         ):
-            inner_type = typing_extensions.get_args(clean_type)[0]
+            inner_elem_type = _cached_get_args(clean_type)[0]
             return [
                 convert_and_respect_annotation_metadata(
                     object_=item,
                     annotation=annotation,
-                    inner_type=inner_type,
+                    inner_type=inner_elem_type,
                     direction=direction,
                 )
                 for item in object_
             ]
 
-    if typing_extensions.get_origin(clean_type) == typing.Union:
+    # Union detection
+    if origin == typing.Union:
         # We should be able to ~relatively~ safely try to convert keys against all
         # member types in the union, the edge case here is if one member aliases a field
         # of the same name to a different name from another member
         # Or if another member aliases a field of the same name that another member does not.
-        for member in typing_extensions.get_args(clean_type):
+        for member in _cached_get_args(clean_type):
             object_ = convert_and_respect_annotation_metadata(
                 object_=object_,
                 annotation=annotation,
@@ -274,3 +281,26 @@ def _alias_key(
     if direction == "read":
         return aliases_to_field_names.get(key, key)
     return _get_alias_from_type(type_=type_) or key
+
+
+@lru_cache(maxsize=128)
+def _cached_get_origin(type_: typing.Any) -> typing.Any:
+    return typing_extensions.get_origin(type_)
+
+@lru_cache(maxsize=128)
+def _cached_get_args(type_: typing.Any) -> tuple:
+    return typing_extensions.get_args(type_)
+
+@lru_cache(maxsize=256)
+def _cached_remove_annotations(type_: typing.Any) -> typing.Any:
+    maybe_annotated_type = _cached_get_origin(type_)
+    if maybe_annotated_type is None:
+        return type_
+
+    if maybe_annotated_type == typing_extensions.NotRequired:
+        return _cached_remove_annotations(_cached_get_args(type_)[0])
+
+    if maybe_annotated_type == typing_extensions.Annotated:
+        return _cached_remove_annotations(_cached_get_args(type_)[0])
+
+    return type_
