@@ -155,7 +155,10 @@ class UniversalBaseModel(pydantic.BaseModel):
 
 def _union_list_of_pydantic_dicts(source: List[Any], destination: List[Any]) -> List[Any]:
     converted_list: List[Any] = []
-    for i, item in enumerate(source):
+    # Optimization: avoid repeated list accesses
+    n = len(source)
+    for i in range(n):
+        item = source[i]
         destination_value = destination[i]
         if isinstance(item, dict):
             converted_list.append(deep_union_pydantic_dicts(item, destination_value))
@@ -167,18 +170,20 @@ def _union_list_of_pydantic_dicts(source: List[Any], destination: List[Any]) -> 
 
 
 def deep_union_pydantic_dicts(source: Dict[str, Any], destination: Dict[str, Any]) -> Dict[str, Any]:
+    # Optimization: local variables
+    setdefault = destination.setdefault
     for key, value in source.items():
-        node = destination.setdefault(key, {})
         if isinstance(value, dict):
+            node = setdefault(key, {})
             deep_union_pydantic_dicts(value, node)
         # Note: we do not do this same processing for sets given we do not have sets of models
         # and given the sets are unordered, the processing of the set and matching objects would
         # be non-trivial.
         elif isinstance(value, list):
+            node = setdefault(key, {})
             destination[key] = _union_list_of_pydantic_dicts(value, node)
         else:
             destination[key] = value
-
     return destination
 
 
