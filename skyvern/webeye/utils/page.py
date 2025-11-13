@@ -221,8 +221,11 @@ class SkyvernFrame:
         arg: Any | None = None,
         timeout_ms: float = SettingsManager.get_settings().BROWSER_ACTION_TIMEOUT_MS,
     ) -> Any:
+        # Cache division to avoid repeated division in tight loop
+        timeout_s = timeout_ms / 1000
         try:
-            async with asyncio.timeout(timeout_ms / 1000):
+            async with asyncio.timeout(timeout_s):
+                # Frame's evaluate is awaited directly as before; nothing can be batched here
                 return await frame.evaluate(expression=expression, arg=arg)
         except asyncio.TimeoutError:
             LOG.exception("Skyvern timed out trying to analyze the page", expression=expression)
@@ -464,7 +467,8 @@ class SkyvernFrame:
 
     async def is_sibling(self, el1: ElementHandle, el2: ElementHandle) -> bool:
         js_script = "([el1, el2]) => isSibling(el1, el2)"
-        return await self.evaluate(frame=self.frame, expression=js_script, arg=[el1, el2])
+        # Pass list directly as arg as previously
+        return await self.evaluate(self.frame, js_script, [el1, el2])
 
     async def has_ASP_client_control(self) -> bool:
         js_script = "() => hasASPClientControl()"
