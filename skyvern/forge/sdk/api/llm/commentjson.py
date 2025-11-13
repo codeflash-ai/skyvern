@@ -11,6 +11,16 @@ from lark.lexer import Token
 from lark.reconstruct import Reconstructor
 from lark.tree import Tree
 
+_BOM32_BE = codecs.BOM_UTF32_BE
+
+_BOM32_LE = codecs.BOM_UTF32_LE
+
+_BOM16_BE = codecs.BOM_UTF16_BE
+
+_BOM16_LE = codecs.BOM_UTF16_LE
+
+_BOM8 = codecs.BOM_UTF8
+
 parser = Lark(
     """
     ?start: value
@@ -49,12 +59,11 @@ def detect_encoding(b: bytes) -> str:
     Source can be found at https://bit.ly/2OHqCIK.
     """
 
-    bstartswith = b.startswith
-    if bstartswith((codecs.BOM_UTF32_BE, codecs.BOM_UTF32_LE)):
+    if b.startswith(_BOM32_BE) or b.startswith(_BOM32_LE):
         return "utf-32"
-    if bstartswith((codecs.BOM_UTF16_BE, codecs.BOM_UTF16_LE)):
+    if b.startswith(_BOM16_BE) or b.startswith(_BOM16_LE):
         return "utf-16"
-    if bstartswith(codecs.BOM_UTF8):
+    if b.startswith(_BOM8):
         return "utf-8-sig"
 
     if len(b) >= 4:
