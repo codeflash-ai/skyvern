@@ -123,7 +123,11 @@ class SkyvernLocator:
 
     def filter(self, **kwargs: Any) -> "SkyvernLocator":
         """Filter the locator by additional criteria."""
-        return SkyvernLocator(self._locator.filter(**kwargs))
+        filtered_locator = self._locator.filter(**kwargs)
+        # Direct return without function call reallocation
+        if filtered_locator is self._locator:
+            return self  # Avoid creating a new SkyvernLocator if unchanged
+        return SkyvernLocator(filtered_locator)
 
     def locator(self, selector: str, **kwargs: Any) -> "SkyvernLocator":
         """Find a descendant element."""
