@@ -620,9 +620,14 @@ async def create_workflow_from_prompt(
 
 async def _validate_file_size(file: UploadFile) -> UploadFile:
     try:
-        file.file.seek(0, 2)  # Move the pointer to the end of the file
-        size = file.file.tell()  # Get the current position of the pointer, which represents the file size
-        file.file.seek(0)  # Reset the pointer back to the beginning
+        # Offload file size seeking/telling to thread to avoid blocking event loop
+        def get_file_size(f):
+            f.seek(0, 2)
+            size = f.tell()
+            f.seek(0)
+            return size
+
+        size = await asyncio.to_thread(get_file_size, file.file)
     except Exception as e:
         raise HTTPException(status_code=500, detail="Could not determine file size.") from e
 
