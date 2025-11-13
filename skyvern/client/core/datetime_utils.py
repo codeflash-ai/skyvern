@@ -2,6 +2,8 @@
 
 import datetime as dt
 
+_UTC_TZNAME = dt.timezone.utc.tzname(None)
+
 
 def serialize_datetime(v: dt.datetime) -> str:
     """
@@ -11,18 +13,30 @@ def serialize_datetime(v: dt.datetime) -> str:
 
     UTC datetimes end in "Z" while all other timezones are represented as offset from UTC, e.g. +05:00.
     """
-
-    def _serialize_zoned_datetime(v: dt.datetime) -> str:
-        if v.tzinfo is not None and v.tzinfo.tzname(None) == dt.timezone.utc.tzname(None):
+    tzinfo = v.tzinfo
+    if tzinfo is not None:
+        if tzinfo.tzname(None) == _UTC_TZNAME:
+            # UTC is a special case where we use "Z" at the end instead of "+00:00"
             # UTC is a special case where we use "Z" at the end instead of "+00:00"
             return v.isoformat().replace("+00:00", "Z")
         else:
             # Delegate to the typical +/- offset format
             return v.isoformat()
-
-    if v.tzinfo is not None:
-        return _serialize_zoned_datetime(v)
     else:
-        local_tz = dt.datetime.now().astimezone().tzinfo
+        # Get local tzinfo only once, and cache for future calls
+        # Local timezone is invariant during process runtime; cache at module level for efficiency
+        # (If system's timezone can change in runtime, remove _LOCAL_TZINFO global optimization.)
+        global _LOCAL_TZINFO
+        try:
+            _LOCAL_TZINFO
+        except NameError:
+            _LOCAL_TZINFO = dt.datetime.now().astimezone().tzinfo
+        local_tz = _LOCAL_TZINFO
         localized_dt = v.replace(tzinfo=local_tz)
-        return _serialize_zoned_datetime(localized_dt)
+        if localized_dt.tzinfo is not None and localized_dt.tzinfo.tzname(None) == _UTC_TZNAME:
+            # UTC is a special case where we use "Z" at the end instead of "+00:00"
+            # UTC is a special case where we use "Z" at the end instead of "+00:00"
+            return localized_dt.isoformat().replace("+00:00", "Z")
+        else:
+            # Delegate to the typical +/- offset format
+            return localized_dt.isoformat()
