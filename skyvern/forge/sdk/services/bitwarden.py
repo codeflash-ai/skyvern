@@ -33,6 +33,8 @@ from skyvern.forge.sdk.schemas.credentials import (
 )
 from skyvern.forge.sdk.services.credentials import parse_totp_secret
 
+_email_pattern = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
+
 LOG = structlog.get_logger()
 BITWARDEN_SERVER_BASE_URL = f"{settings.BITWARDEN_SERVER}:{settings.BITWARDEN_SERVER_PORT or 8002}"
 
@@ -91,8 +93,7 @@ def get_list_response_item_from_bitwarden_item(item: dict) -> CredentialItem:
 def is_valid_email(email: str | None) -> bool:
     if not email:
         return False
-    pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
-    return re.match(pattern, email) is not None
+    return _email_pattern.match(email) is not None
 
 
 class BitwardenConstants(StrEnum):
