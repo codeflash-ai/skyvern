@@ -26,6 +26,7 @@ class SdkSkyvernPageAi(SkyvernPageAi):
     ):
         self._browser = browser
         self._page = page
+        self._server_verified: bool = False
 
     async def ai_click(
         self,
@@ -93,7 +94,10 @@ class SdkSkyvernPageAi(SkyvernPageAi):
     ) -> str:
         """Select an option from a dropdown using AI via API call."""
 
-        await self._browser.sdk.ensure_has_server()
+        if not self._server_verified:
+            await self._browser.sdk.ensure_has_server()
+            self._server_verified = True
+
         response = await self._browser.client.run_sdk_action(
             url=self._page.url,
             action=SdkAction_AiSelectOption(
