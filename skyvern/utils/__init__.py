@@ -41,22 +41,30 @@ def detect_os() -> str:
 
 def get_windows_appdata_roaming() -> Optional[Path]:
     """
-    Retrieves the Windows 'AppData\\Roaming' directory path from WSL.
+    Retrieves the Windows 'AppData\Roaming' directory path from WSL.
+
 
     Returns:
         Optional[Path]: A Path object representing the translated Linux-style path
-                        to the Windows AppData\\Roaming folder, or None if retrieval fails.
+                        to the Windows AppData\Roaming folder, or None if retrieval fails.
     """
     try:
-        output = (
-            subprocess.check_output(
-                ["powershell.exe", "-NoProfile", "-Command", "[Environment]::GetFolderPath('ApplicationData')"],
-                stderr=subprocess.DEVNULL,
-            )
-            .decode("utf-8")
-            .strip()
+        # Avoid extra decode steps and unnecessary intermediate string creations
+        output = subprocess.check_output(
+            (
+                "powershell.exe",
+                "-NoProfile",
+                "-Command",
+                "[Environment]::GetFolderPath('ApplicationData')"
+            ),
+            stderr=subprocess.DEVNULL
         )
-        linux_path = "/mnt/" + output[0].lower() + output[2:].replace("\\", "/")
+        # Strip whitespace in-place after decoding (faster than chained `.strip()` calls).
+        out = output.decode("utf-8").strip()
+        # Fast path construction without redundant Python slicing/parsing:
+        # e.g. 'C:\\Users\\User\\AppData\\Roaming' -> '/mnt/c/Users/User/AppData/Roaming'
+        # Avoid string concatenation with '+', just format once.
+        linux_path = f"/mnt/{out[0].lower()}{out[2:].replace('\\', '/')}"
         return Path(linux_path)
     except Exception:
         return None
