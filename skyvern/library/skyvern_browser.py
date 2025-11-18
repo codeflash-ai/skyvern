@@ -81,7 +81,7 @@ class SkyvernBrowser:
             page = self._browser_context.pages[-1]
         else:
             page = await self._browser_context.new_page()
-        return await self._create_skyvern_page(page)
+        return SkyvernBrowserPage(self, page)
 
     async def new_page(self) -> SkyvernBrowserPage:
         """Create a new page (tab) in the browser context.
@@ -96,4 +96,5 @@ class SkyvernBrowser:
         return await self._create_skyvern_page(page)
 
     async def _create_skyvern_page(self, page: Page) -> SkyvernBrowserPage:
+        # The SkyvernBrowserPage constructor does not require async - keep for signature compatibility
         return SkyvernBrowserPage(self, page)
