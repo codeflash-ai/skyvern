@@ -80,7 +80,12 @@ class ParameterYAML(BaseModel, abc.ABC):
     @field_validator("key")
     @classmethod
     def validate_no_whitespace(cls, v: str) -> str:
-        if any(char in v for char in [" ", "\t", "\n", "\r"]):
+        if (
+            v.find(" ") != -1 
+            or v.find("\t") != -1 
+            or v.find("\n") != -1 
+            or v.find("\r") != -1
+        ):
             raise ValueError("Key cannot contain whitespaces")
         return v
 
