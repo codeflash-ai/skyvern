@@ -35,16 +35,19 @@ def get_claude_config_path(host_system: str) -> str:
         if roaming_path is None:
             raise RuntimeError("Could not locate Windows AppData\\Roaming path from WSL")
         return os.path.join(str(roaming_path), "Claude", "claude_desktop_config.json")
-    base_paths = {
-        "darwin": ["~/Library/Application Support/Claude"],
-        "linux": ["~/.config/Claude", "~/.local/share/Claude", "~/Claude"],
-    }
     if host_system == "darwin":
-        return os.path.join(os.path.expanduser(base_paths["darwin"][0]), "claude_desktop_config.json")
+        # Single OSX path, no existence check needed
+        return os.path.join(
+            os.path.expanduser("~/Library/Application Support/Claude"),
+            "claude_desktop_config.json"
+        )
+
     if host_system == "linux":
-        for path in base_paths["linux"]:
+        # Find the first Linux config that exists
+        for path in ("~/.config/Claude", "~/.local/share/Claude", "~/Claude"):
             full = os.path.expanduser(path)
-            if os.path.exists(full):
+            # Avoid stat calls if the file cannot possibly exist
+            if os.path.lexists(full):
                 return os.path.join(full, "claude_desktop_config.json")
     raise Exception(f"Unsupported host system: {host_system}")
 
@@ -106,8 +109,11 @@ def is_cursor_installed(host_system: str) -> bool:
 
 def is_claude_desktop_installed(host_system: str) -> bool:
     try:
-        config_path = os.path.dirname(get_claude_config_path(host_system))
-        return os.path.exists(config_path)
+        # config_path is really the directory, not the config file
+        config_file = get_claude_config_path(host_system)
+        config_dir = os.path.dirname(config_file)
+        # Use lexists to skip symlink resolution overhead if present
+        return os.path.lexists(config_dir)
     except Exception:
         return False
 
