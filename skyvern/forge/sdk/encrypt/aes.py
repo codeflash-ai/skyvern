@@ -13,9 +13,17 @@ default_salt = hashlib.md5(b"deterministic_salt_0123456789").digest()
 
 class AES(BaseEncryptor):
     def __init__(self, *, secret_key: str, salt: str | None = None, iv: str | None = None) -> None:
-        self.secret_key = hashlib.md5(secret_key.encode("utf-8")).digest()
-        self.salt = hashlib.md5(salt.encode("utf-8")).digest() if salt else default_salt
-        self.iv = hashlib.md5(iv.encode("utf-8")).digest() if iv else default_iv
+        sec_key_enc = secret_key.encode("utf-8")
+        self.secret_key = hashlib.md5(sec_key_enc).digest()
+        if salt:
+            # Avoid re-encoding default_salt; only hash if needed
+            self.salt = hashlib.md5(salt.encode("utf-8")).digest()
+        else:
+            self.salt = default_salt
+        if iv:
+            self.iv = hashlib.md5(iv.encode("utf-8")).digest()
+        else:
+            self.iv = default_iv
 
     def method(self) -> EncryptMethod:
         return EncryptMethod.AES
