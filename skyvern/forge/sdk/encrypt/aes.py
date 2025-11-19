@@ -55,7 +55,7 @@ class AES(BaseEncryptor):
     def _pad(self, data: bytes) -> bytes:
         block_size = 16
         padding_length = block_size - (len(data) % block_size)
-        padding = bytes([padding_length] * padding_length)
+        padding = (padding_length).to_bytes(1, 'big') * padding_length
         return data + padding
 
     def _unpad(self, data: bytes) -> bytes:
