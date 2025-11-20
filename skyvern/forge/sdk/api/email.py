@@ -1,3 +1,4 @@
+import asyncio
 import smtplib
 from email.message import EmailMessage
 
@@ -11,24 +12,33 @@ LOG = structlog.get_logger()
 
 async def _send(*, message: EmailMessage) -> bool:
     settings = SettingsManager.get_settings()
-    try:
-        smtp_host = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT)
+    async def smtp_send():
+        try:
+            smtp_host = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT)
 
-        LOG.info("email: Connected to SMTP server")
+            LOG.info("email: Connected to SMTP server")
 
-        smtp_host.starttls()
-        smtp_host.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+            smtp_host.starttls()
+            smtp_host.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
 
-        LOG.info("email: Logged in to SMTP server")
+            LOG.info("email: Logged in to SMTP server")
 
-        smtp_host.send_message(message)
+            smtp_host.send_message(message)
 
-        LOG.info("email: Email sent")
-    except Exception as e:
-        LOG.error("email: Failed to send email", error=str(e), host=settings.SMTP_HOST, port=settings.SMTP_PORT)
-        raise e
+            LOG.info("email: Email sent")
+        except Exception as e:
+            LOG.error("email: Failed to send email", error=str(e), host=settings.SMTP_HOST, port=settings.SMTP_PORT)
+            raise e
+        finally:
+            try:
+                smtp_host.quit()
+            except Exception:
+                pass  # Do not mask send errors with quit errors
 
-    return True
+        return True
+
+    # Offload blocking SMTP calls to a background thread
+    return await asyncio.to_thread(smtp_send)
 
 
 def validate_recipients(recipients: list[str]) -> None:
