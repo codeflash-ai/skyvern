@@ -390,18 +390,19 @@ class AsyncHttpClient:
         omit: typing.Optional[typing.Any] = None,
         force_multipart: typing.Optional[bool] = None,
     ) -> httpx.Response:
-        base_url = self.get_base_url(base_url)
+        base_url_str = self.get_base_url(base_url)
+        # Cache request_options, header logic, additional params to reduce recomputation cost
         timeout = (
             request_options.get("timeout_in_seconds")
             if request_options is not None and request_options.get("timeout_in_seconds") is not None
             else self.base_timeout()
         )
-
-        request_files: typing.Optional[RequestFiles] = (
-            convert_file_dict_to_httpx_tuples(remove_omit_from_dict(remove_none_from_dict(files), omit))
-            if (files is not None and files is not omit and isinstance(files, dict))
-            else None
-        )
+        # File handling optimized
+        request_files: typing.Optional[RequestFiles] = None
+        if files is not None and files is not omit and isinstance(files, dict):
+            filtered_files = remove_omit_from_dict(remove_none_from_dict(files), omit)
+            if filtered_files:
+                request_files = convert_file_dict_to_httpx_tuples(filtered_files)
 
         if (request_files is None or len(request_files) == 0) and force_multipart:
             request_files = FORCE_MULTIPART
@@ -409,35 +410,35 @@ class AsyncHttpClient:
         json_body, data_body = get_request_body(json=json, data=data, request_options=request_options, omit=omit)
 
         # Add the input to each of these and do None-safety checks
+
+        # Compute headers, params dictionary once
+        base_headers_dict = self.base_headers()
+        headers_dict = base_headers_dict.copy()
+        if headers is not None:
+            headers_dict.update(headers)
+        if request_options is not None and request_options.get("additional_headers", {}):
+            headers_dict.update(request_options.get("additional_headers", {}))
+        encoded_headers = jsonable_encoder(remove_none_from_dict(headers_dict))
+
+        params_dict = {}
+        if params is not None:
+            params_dict.update(params)
+        if request_options is not None and request_options.get("additional_query_parameters", {}):
+            params_dict.update(request_options.get("additional_query_parameters", {}))
+        encoded_params = encode_query(
+            jsonable_encoder(
+                remove_none_from_dict(remove_omit_from_dict(params_dict, omit))
+            )
+        )
+
+        # Only one urljoin call, str join avoids recomputation as well
+        request_url = urllib.parse.urljoin(f"{base_url_str}/", path)
+
         response = await self.httpx_client.request(
             method=method,
-            url=urllib.parse.urljoin(f"{base_url}/", path),
-            headers=jsonable_encoder(
-                remove_none_from_dict(
-                    {
-                        **self.base_headers(),
-                        **(headers if headers is not None else {}),
-                        **(request_options.get("additional_headers", {}) or {} if request_options is not None else {}),
-                    }
-                )
-            ),
-            params=encode_query(
-                jsonable_encoder(
-                    remove_none_from_dict(
-                        remove_omit_from_dict(
-                            {
-                                **(params if params is not None else {}),
-                                **(
-                                    request_options.get("additional_query_parameters", {}) or {}
-                                    if request_options is not None
-                                    else {}
-                                ),
-                            },
-                            omit,
-                        )
-                    )
-                )
-            ),
+            url=request_url,
+            headers=encoded_headers,
+            params=encoded_params,
             json=json_body,
             data=data_body,
             content=content,
