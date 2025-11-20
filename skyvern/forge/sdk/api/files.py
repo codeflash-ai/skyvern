@@ -239,7 +239,10 @@ def get_number_of_files_in_directory(directory: Path, recursive: bool = False) -
 
 
 def sanitize_filename(filename: str) -> str:
-    return "".join(c for c in filename if c.isalnum() or c in ["-", "_", ".", "%", " "])
+    # Create a set for O(1) membership checks instead of a list
+    allowed = {"-", "_", ".", "%", " "}
+    # Use a list comprehension for improved performance in string assembly
+    return "".join([c for c in filename if c.isalnum() or c in allowed])
 
 
 def rename_file(file_path: str, new_file_name: str) -> str:
