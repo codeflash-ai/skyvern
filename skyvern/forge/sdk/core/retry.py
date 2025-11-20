@@ -30,36 +30,34 @@ def retry(
     if exceptions is None:
         exceptions = Exception
 
-    def retry_decorator(func: F) -> F:
-        @wraps(func)
-        async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
-            remaining_tries, current_delay = tries, delay
-            while remaining_tries > 1:
-                try:
-                    return await func(*args, **kwargs)
-                except exceptions as e:
-                    LOG.warning(f"Retrying {func.__name__} in {current_delay} seconds... {e}")
-                    await asyncio.sleep(current_delay)
-                    remaining_tries -= 1
-                    current_delay *= backoff
-            return await func(*args, **kwargs)
+    def retry_decorator(func: 'F') -> 'F':
+        is_async = asyncio.iscoroutinefunction(func)
 
-        @wraps(func)
-        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-            remaining_tries, current_delay = tries, delay
-            while remaining_tries > 1:
-                try:
-                    return func(*args, **kwargs)
-                except exceptions as e:
-                    LOG.warning(f"Retrying {func.__name__} in {current_delay} seconds... {e}")
-                    time.sleep(current_delay)
-                    remaining_tries -= 1
-                    current_delay *= backoff
-            return func(*args, **kwargs)
-
-        # Return async wrapper if function is async, otherwise sync wrapper
-        if asyncio.iscoroutinefunction(func):
-            return cast(F, async_wrapper)
-        return cast(F, sync_wrapper)
+        if is_async:
+            @wraps(func)
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                remaining_tries, current_delay = tries, delay
+                for _ in range(tries - 1):
+                    try:
+                        return await func(*args, **kwargs)
+                    except exceptions as e:
+                        LOG.warning(f"Retrying {func.__name__} in {current_delay} seconds... {e}")
+                        await asyncio.sleep(current_delay)
+                        current_delay *= backoff
+                return await func(*args, **kwargs)
+            return cast('F', async_wrapper)
+        else:
+            @wraps(func)
+            def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+                remaining_tries, current_delay = tries, delay
+                for _ in range(tries - 1):
+                    try:
+                        return func(*args, **kwargs)
+                    except exceptions as e:
+                        LOG.warning(f"Retrying {func.__name__} in {current_delay} seconds... {e}")
+                        time.sleep(current_delay)
+                        current_delay *= backoff
+                return func(*args, **kwargs)
+            return cast('F', sync_wrapper)
 
     return retry_decorator
