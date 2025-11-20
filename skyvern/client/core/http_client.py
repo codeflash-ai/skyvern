@@ -201,44 +201,49 @@ class HttpClient:
 
         json_body, data_body = get_request_body(json=json, data=data, request_options=request_options, omit=omit)
 
-        request_files: typing.Optional[RequestFiles] = (
-            convert_file_dict_to_httpx_tuples(remove_omit_from_dict(remove_none_from_dict(files), omit))
-            if (files is not None and files is not omit and isinstance(files, dict))
-            else None
-        )
+        # Optimize file resolution by inlining omit/none check and only process when necessary
+        request_files: typing.Optional[RequestFiles] = None
+        if files is not None and files is not omit and isinstance(files, dict):
+            fn_files = remove_none_from_dict(files)
+            if fn_files:
+                fn_files = remove_omit_from_dict(fn_files, omit)
+                if fn_files:
+                    request_files = convert_file_dict_to_httpx_tuples(fn_files)
 
         if (request_files is None or len(request_files) == 0) and force_multipart:
             request_files = FORCE_MULTIPART
 
+
+        # Avoid repeated dict unpackings and redundant function calls
+        base_headers_dict = self.base_headers()
+        additional_headers = request_options.get("additional_headers", {}) if request_options is not None else {}
+        merged_headers = {}
+        if base_headers_dict:
+            merged_headers.update(base_headers_dict)
+        if headers:
+            merged_headers.update(headers)
+        if additional_headers:
+            merged_headers.update(additional_headers)
+        encoded_headers = jsonable_encoder(
+            remove_none_from_dict(merged_headers)
+        )
+
+        params_dict = {}
+        if params:
+            params_dict.update(params)
+        additional_params = request_options.get("additional_query_parameters", {}) if request_options is not None else {}
+        if additional_params:
+            params_dict.update(additional_params)
+        if params_dict or omit is not None:
+            params_dict = remove_omit_from_dict(params_dict, omit)
+            params_dict = remove_none_from_dict(params_dict)
+        encoded_params = encode_query(jsonable_encoder(params_dict)) if params_dict else None
+
         response = self.httpx_client.request(
             method=method,
             url=urllib.parse.urljoin(f"{base_url}/", path),
-            headers=jsonable_encoder(
-                remove_none_from_dict(
-                    {
-                        **self.base_headers(),
-                        **(headers if headers is not None else {}),
-                        **(request_options.get("additional_headers", {}) or {} if request_options is not None else {}),
-                    }
-                )
-            ),
-            params=encode_query(
-                jsonable_encoder(
-                    remove_none_from_dict(
-                        remove_omit_from_dict(
-                            {
-                                **(params if params is not None else {}),
-                                **(
-                                    request_options.get("additional_query_parameters", {}) or {}
-                                    if request_options is not None
-                                    else {}
-                                ),
-                            },
-                            omit,
-                        )
-                    )
-                )
-            ),
+            headers=encoded_headers,
+            params=encoded_params,
             json=json_body,
             data=data_body,
             content=content,
@@ -247,22 +252,22 @@ class HttpClient:
         )
 
         max_retries: int = request_options.get("max_retries", 0) if request_options is not None else 0
-        if _should_retry(response=response):
-            if max_retries > retries:
-                time.sleep(_retry_timeout(response=response, retries=retries))
-                return self.request(
-                    path=path,
-                    method=method,
-                    base_url=base_url,
-                    params=params,
-                    json=json,
-                    content=content,
-                    files=files,
-                    headers=headers,
-                    request_options=request_options,
-                    retries=retries + 1,
-                    omit=omit,
-                )
+        if _should_retry(response=response) and max_retries > retries:
+            time.sleep(_retry_timeout(response=response, retries=retries))
+            return self.request(
+                path=path,
+                method=method,
+                base_url=base_url,
+                params=params,
+                json=json,
+                content=content,
+                files=files,
+                headers=headers,
+                request_options=request_options,
+                retries=retries + 1,
+                omit=omit,
+            )
+
 
         return response
 

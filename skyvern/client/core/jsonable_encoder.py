@@ -29,19 +29,25 @@ DictIntStrAny = Dict[Union[int, str], Any]
 
 
 def jsonable_encoder(obj: Any, custom_encoder: Optional[Dict[Any, Callable[[Any], Any]]] = None) -> Any:
+    # Fast path for common primitive types
+    if isinstance(obj, (str, int, float, type(None))):
+        return obj
+
     custom_encoder = custom_encoder or {}
     if custom_encoder:
-        if type(obj) in custom_encoder:
-            return custom_encoder[type(obj)](obj)
+        obj_type = type(obj)
+        if obj_type in custom_encoder:
+            return custom_encoder[obj_type](obj)
         else:
             for encoder_type, encoder_instance in custom_encoder.items():
                 if isinstance(obj, encoder_type):
                     return encoder_instance(obj)
     if isinstance(obj, pydantic.BaseModel):
         if IS_PYDANTIC_V2:
-            encoder = getattr(obj.model_config, "json_encoders", {})  # type: ignore # Pydantic v2
+            encoder = dict(getattr(obj.model_config, "json_encoders", {}))  # type: ignore # Pydantic v2
         else:
-            encoder = getattr(obj.__config__, "json_encoders", {})  # type: ignore # Pydantic v1
+            encoder = dict(getattr(obj.__config__, "json_encoders", {}))  # type: ignore # Pydantic v1
+        # Note: encoder.update() is safe (object is fresh or explicitly copied above)
         if custom_encoder:
             encoder.update(custom_encoder)
         obj_dict = obj.dict(by_alias=True)
@@ -59,26 +65,17 @@ def jsonable_encoder(obj: Any, custom_encoder: Optional[Dict[Any, Callable[[Any]
         return obj.value
     if isinstance(obj, PurePath):
         return str(obj)
-    if isinstance(obj, (str, int, float, type(None))):
-        return obj
     if isinstance(obj, dt.datetime):
         return serialize_datetime(obj)
     if isinstance(obj, dt.date):
         return str(obj)
     if isinstance(obj, dict):
-        encoded_dict = {}
-        allowed_keys = set(obj.keys())
-        for key, value in obj.items():
-            if key in allowed_keys:
-                encoded_key = jsonable_encoder(key, custom_encoder=custom_encoder)
-                encoded_value = jsonable_encoder(value, custom_encoder=custom_encoder)
-                encoded_dict[encoded_key] = encoded_value
-        return encoded_dict
+        # Avoid set lookup since dict iteration is already safe and keys are unique
+        return {jsonable_encoder(key, custom_encoder=custom_encoder): jsonable_encoder(value, custom_encoder=custom_encoder) for key, value in obj.items()}
     if isinstance(obj, (list, set, frozenset, GeneratorType, tuple)):
-        encoded_list = []
-        for item in obj:
-            encoded_list.append(jsonable_encoder(item, custom_encoder=custom_encoder))
-        return encoded_list
+        # Use list comprehension for more efficient encoding
+        return [jsonable_encoder(item, custom_encoder=custom_encoder) for item in obj]
+
 
     def fallback_serializer(o: Any) -> Any:
         attempt_encode = encode_by_type(o)
@@ -88,13 +85,12 @@ def jsonable_encoder(obj: Any, custom_encoder: Optional[Dict[Any, Callable[[Any]
         try:
             data = dict(o)
         except Exception as e:
-            errors: List[Exception] = []
-            errors.append(e)
+            errors: List[Exception] = [e]
             try:
                 data = vars(o)
-            except Exception as e:
-                errors.append(e)
-                raise ValueError(errors) from e
+            except Exception as e2:
+                errors.append(e2)
+                raise ValueError(errors) from e2
         return jsonable_encoder(data, custom_encoder=custom_encoder)
 
     return to_jsonable_with_fallback(obj, fallback_serializer)
