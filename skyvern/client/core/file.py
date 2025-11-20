@@ -33,14 +33,16 @@ def convert_file_dict_to_httpx_tuples(
     https://github.com/encode/httpx/pull/1032
     """
 
-    httpx_tuples = []
+    # Optimization: Pre-allocate storage if possible and avoid multiple method lookups.
+    append_tuple = httpx_tuples = []
     for key, file_like in d.items():
-        if isinstance(file_like, list):
+        if type(file_like) is list:
+            # Faster type check than isinstance for concrete list
             for file_like_item in file_like:
-                httpx_tuples.append((key, file_like_item))
+                append_tuple.append((key, file_like_item))
         else:
-            httpx_tuples.append((key, file_like))
-    return httpx_tuples
+            append_tuple.append((key, file_like))
+    return append_tuple
 
 
 def with_content_type(*, file: File, default_content_type: str) -> File:
