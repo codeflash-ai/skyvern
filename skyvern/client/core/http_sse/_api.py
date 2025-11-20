@@ -9,6 +9,8 @@ from ._decoders import SSEDecoder
 from ._exceptions import SSEError
 from ._models import ServerSentEvent
 
+_charset_re = re.compile(r"charset=([^;\s]+)", re.IGNORECASE)
+
 
 class EventSource:
     def __init__(self, response: httpx.Response) -> None:
@@ -26,7 +28,7 @@ class EventSource:
         content_type = self._response.headers.get("content-type", "")
 
         # Parse charset parameter using regex
-        charset_match = re.search(r"charset=([^;\s]+)", content_type, re.IGNORECASE)
+        charset_match = _charset_re.search(content_type)
         if charset_match:
             charset = charset_match.group(1).strip("\"'")
             # Validate that it's a known encoding
