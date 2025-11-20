@@ -18,6 +18,8 @@ from .remove_none_from_dict import remove_none_from_dict
 from .request_options import RequestOptions
 from httpx._types import RequestFiles
 
+_retryable_400s = {429, 408, 409}
+
 INITIAL_RETRY_DELAY_SECONDS = 0.5
 MAX_RETRY_DELAY_SECONDS = 10
 MAX_RETRY_DELAY_SECONDS_FROM_HEADER = 30
@@ -85,8 +87,7 @@ def _retry_timeout(response: httpx.Response, retries: int) -> float:
 
 
 def _should_retry(response: httpx.Response) -> bool:
-    retryable_400s = [429, 408, 409]
-    return response.status_code >= 500 or response.status_code in retryable_400s
+    return response.status_code >= 500 or response.status_code in _retryable_400s
 
 
 def remove_omit_from_dict(
