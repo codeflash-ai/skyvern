@@ -7,7 +7,7 @@ import shutil
 import tempfile
 import zipfile
 from pathlib import Path
-from urllib.parse import parse_qsl, unquote, urlparse
+from urllib.parse import unquote_to_bytes, parse_qsl, unquote, urlparse
 
 import aiohttp
 import structlog
@@ -325,4 +325,8 @@ def parse_uri_to_path(uri: str) -> str:
     if parsed_uri.scheme != "file":
         raise ValueError(f"Invalid URI scheme: {parsed_uri.scheme} expected: file")
     path = parsed_uri.netloc + parsed_uri.path
-    return unquote(path)
+    # Only decode if there's percent-encoding, else avoid the decode overhead
+    if '%' in path:
+        # Use unquote_to_bytes for a more efficient decode, then decode (UTF-8 per RFC 8089)
+        return unquote_to_bytes(path).decode("utf-8")
+    return path
