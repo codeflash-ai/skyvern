@@ -15,10 +15,14 @@ from multidict import CIMultiDictProxy
 from yarl import URL
 
 from skyvern.config import settings
-from skyvern.constants import BROWSER_DOWNLOAD_TIMEOUT, BROWSER_DOWNLOADING_SUFFIX, REPO_ROOT_DIR
-from skyvern.exceptions import DownloadFileMaxSizeExceeded, DownloadFileMaxWaitingTime
+from skyvern.constants import (BROWSER_DOWNLOAD_TIMEOUT,
+                               BROWSER_DOWNLOADING_SUFFIX, REPO_ROOT_DIR)
+from skyvern.exceptions import (DownloadFileMaxSizeExceeded,
+                                DownloadFileMaxWaitingTime)
 from skyvern.forge.sdk.api.aws import AsyncAWSClient, aws_client
 from skyvern.utils.url_validators import encode_url
+
+_created_dirs = set()
 
 LOG = structlog.get_logger()
 
@@ -269,7 +273,9 @@ def create_folder_if_not_exist(dir: str) -> None:
 
 def get_skyvern_temp_dir() -> str:
     temp_dir = settings.TEMP_PATH
-    create_folder_if_not_exist(temp_dir)
+    if temp_dir not in _created_dirs:
+        create_folder_if_not_exist(temp_dir)
+        _created_dirs.add(temp_dir)
     return temp_dir
 
 
