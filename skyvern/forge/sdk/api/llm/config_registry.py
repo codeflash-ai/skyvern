@@ -68,7 +68,7 @@ class LLMConfigRegistry:
 
     @classmethod
     def get_model_names(cls) -> list[str]:
-        return list(cls._configs.keys())
+        return list(cls._configs)
 
 
 if settings.ENABLE_OPENAI:
