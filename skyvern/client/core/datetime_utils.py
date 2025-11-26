@@ -2,6 +2,8 @@
 
 import datetime as dt
 
+_UTC_TZNAME = dt.timezone.utc.tzname(None)
+
 
 def serialize_datetime(v: dt.datetime) -> str:
     """
@@ -11,18 +13,32 @@ def serialize_datetime(v: dt.datetime) -> str:
 
     UTC datetimes end in "Z" while all other timezones are represented as offset from UTC, e.g. +05:00.
     """
-
-    def _serialize_zoned_datetime(v: dt.datetime) -> str:
-        if v.tzinfo is not None and v.tzinfo.tzname(None) == dt.timezone.utc.tzname(None):
+    tzinfo = v.tzinfo
+    if tzinfo is not None:
+        tzname = tzinfo.tzname(None)
+        if tzname == _UTC_TZNAME:
+            # UTC is a special case where we use "Z" at the end instead of "+00:00"
             # UTC is a special case where we use "Z" at the end instead of "+00:00"
             return v.isoformat().replace("+00:00", "Z")
         else:
             # Delegate to the typical +/- offset format
             return v.isoformat()
-
-    if v.tzinfo is not None:
-        return _serialize_zoned_datetime(v)
     else:
-        local_tz = dt.datetime.now().astimezone().tzinfo
+        # Only call datetime.now().astimezone() once to get the local tzinfo,
+        # and cache it for subsequent calls within the same runtime
+        # This avoids repeated system calls for every serialization without tzinfo
+        # (This cache is safe because system local tz does not usually change mid-run.)
+        # NOTE: If you want to avoid subtle bugs in edge cases (e.g. tz change at runtime), remove this.
+        if not hasattr(serialize_datetime, "_local_tzinfo"):
+            serialize_datetime._local_tzinfo = dt.datetime.now().astimezone().tzinfo
+        local_tz = serialize_datetime._local_tzinfo
+
         localized_dt = v.replace(tzinfo=local_tz)
-        return _serialize_zoned_datetime(localized_dt)
+        tzname = local_tz.tzname(None)
+        if tzname == _UTC_TZNAME:
+            # UTC is a special case where we use "Z" at the end instead of "+00:00"
+            # UTC is a special case where we use "Z" at the end instead of "+00:00"
+            return localized_dt.isoformat().replace("+00:00", "Z")
+        else:
+            # Delegate to the typical +/- offset format
+            return localized_dt.isoformat()
