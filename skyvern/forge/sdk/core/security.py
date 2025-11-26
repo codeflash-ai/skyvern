@@ -11,12 +11,19 @@ from skyvern.config import settings
 
 
 def _normalize_numbers(x: Any) -> Any:
-    if isinstance(x, float):
+    # Optimize isinstance: check type once for dict/list rather than repeatedly.
+    x_type = type(x)
+    if x_type is float:
+        # Use float.is_integer() only when type is float (most efficient dispatch)
         return int(x) if x.is_integer() else x
-    if isinstance(x, dict):
-        return {k: _normalize_numbers(v) for k, v in x.items()}
-    if isinstance(x, list):
-        return [_normalize_numbers(v) for v in x]
+    if x_type is dict:
+        # Optimize dict traversal: use a local variable for _normalize_numbers
+        _norm = _normalize_numbers
+        return {k: _norm(v) for k, v in x.items()}
+    if x_type is list:
+        # Optimize list traversal: use a local variable for _normalize_numbers
+        _norm = _normalize_numbers
+        return [_norm(v) for v in x]
     return x
 
 
