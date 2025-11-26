@@ -11,14 +11,12 @@ stop_app = typer.Typer(help="Commands to stop Skyvern services.")
 
 def get_pids_on_port(port: int) -> List[int]:
     """Return a list of PIDs listening on the given port."""
-    pids = []
     try:
-        for conn in psutil.net_connections(kind="inet"):
-            if conn.laddr and conn.laddr.port == port and conn.pid and conn.status == psutil.CONN_LISTEN:
-                pids.append(conn.pid)
+        pids = {conn.pid for conn in psutil.net_connections(kind="inet")
+                if conn.laddr and conn.laddr.port == port and conn.pid and conn.status == psutil.CONN_LISTEN}
     except Exception:
-        pass
-    return list(set(pids))
+        pids = set()
+    return list(pids)
 
 
 def kill_pids(pids: List[int], service_name: str) -> bool:
