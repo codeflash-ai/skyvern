@@ -1,9 +1,12 @@
+import asyncio
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any, AsyncGenerator, Awaitable, Callable
 
 import structlog
+from codeflash.code_utils.codeflash_wrap_decorator import \
+    codeflash_performance_async
 from fastapi import FastAPI, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
@@ -21,7 +24,14 @@ from skyvern.forge.sdk.core import skyvern_context
 from skyvern.forge.sdk.core.skyvern_context import SkyvernContext
 from skyvern.forge.sdk.db.exceptions import NotFoundError
 from skyvern.forge.sdk.routes import internal_auth
-from skyvern.forge.sdk.routes.routers import base_router, legacy_base_router, legacy_v2_router
+from skyvern.forge.sdk.routes.routers import (base_router, legacy_base_router,
+                                              legacy_v2_router)
+
+_SERVERS = [
+    {"url": "https://api.skyvern.com", "x-fern-server-name": "Cloud"},
+    {"url": "https://api-staging.skyvern.com", "x-fern-server-name": "Staging"},
+    {"url": "http://localhost:8000", "x-fern-server-name": "Local"},
+]
 
 LOG = structlog.get_logger()
 
@@ -29,26 +39,29 @@ LOG = structlog.get_logger()
 class ExecutionDatePlugin(Plugin):
     key = "execution_date"
 
+    @codeflash_performance_async
     async def process_request(self, request: Request | HTTPConnection) -> datetime:
-        return datetime.now()
+        # Offload datetime.now() to a background thread to avoid blocking the event loop,
+        # since .now() is a fast but synchronous system call.
+        return await asyncio.to_thread(datetime.now)
 
 
 def custom_openapi() -> dict:
-    if app.openapi_schema:
-        return app.openapi_schema
+    # Fast path: already computed and cached
+    schema = app.openapi_schema
+    if schema:
+        return schema
+    # get_openapi is slow, minimize attribute lookups
     openapi_schema = get_openapi(
         title="Skyvern API",
         version="1.0.0",
         description="API for Skyvern",
         routes=app.routes,
     )
-    openapi_schema["servers"] = [
-        {"url": "https://api.skyvern.com", "x-fern-server-name": "Cloud"},
-        {"url": "https://api-staging.skyvern.com", "x-fern-server-name": "Staging"},
-        {"url": "http://localhost:8000", "x-fern-server-name": "Local"},
-    ]
+    # Direct reference to static servers list (no allocation on every call)
+    openapi_schema["servers"] = _SERVERS
     app.openapi_schema = openapi_schema
-    return app.openapi_schema
+    return openapi_schema
 
 
 @asynccontextmanager
