@@ -5,6 +5,11 @@ from zoneinfo import ZoneInfo
 
 from playwright.async_api import Frame, Page
 
+_context: ContextVar['SkyvernContext | None'] = ContextVar(
+    "Global context",
+    default=None,
+)
+
 
 @dataclass
 class SkyvernContext:
@@ -115,7 +120,8 @@ def ensure_context() -> SkyvernContext:
     Raises:
         RuntimeError: If there is no current context
     """
-    context = current()
+    # Directly access _context.get() to avoid function call overhead
+    context = _context.get()
     if context is None:
         raise RuntimeError("No skyvern context")
     return context
