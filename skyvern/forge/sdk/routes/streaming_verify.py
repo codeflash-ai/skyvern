@@ -140,22 +140,23 @@ async def verify_workflow_run(
     """
 
     if settings.ENV == "local":
+        now = datetime.now()
         dummy_workflow_run = WorkflowRun(
             workflow_id="123",
             workflow_permanent_id="wpid_123",
             workflow_run_id=workflow_run_id,
             organization_id=organization_id,
             status=WorkflowRunStatus.running,
-            created_at=datetime.now(),
-            modified_at=datetime.now(),
+            created_at=now,
+            modified_at=now,
         )
 
         dummy_browser_session = AddressablePersistentBrowserSession(
             persistent_browser_session_id=workflow_run_id,
             organization_id=organization_id,
             browser_address="0.0.0.0:9223",
-            created_at=datetime.now(),
-            modified_at=datetime.now(),
+            created_at=now,
+            modified_at=now,
         )
 
         return dummy_workflow_run, dummy_browser_session
@@ -166,16 +167,18 @@ async def verify_workflow_run(
     )
 
     if not workflow_run:
-        LOG.info("Workflow run not found.", workflow_run_id=workflow_run_id, organization_id=organization_id)
+        if LOG.isEnabledFor("info"):
+            LOG.info("Workflow run not found.", workflow_run_id=workflow_run_id, organization_id=organization_id)
         return None, None
 
     if workflow_run.status.is_final():
-        LOG.info(
-            "Workflow run is in a final state. Closing connection.",
-            workflow_run_status=workflow_run.status,
-            workflow_run_id=workflow_run_id,
-            organization_id=organization_id,
-        )
+        if LOG.isEnabledFor("info"):
+            LOG.info(
+                "Workflow run is in a final state. Closing connection.",
+                workflow_run_status=workflow_run.status,
+                workflow_run_id=workflow_run_id,
+                organization_id=organization_id,
+            )
 
         return None, None
 
@@ -185,12 +188,13 @@ async def verify_workflow_run(
         WorkflowRunStatus.running,
         WorkflowRunStatus.paused,
     ]:
-        LOG.info(
-            "Workflow run is not running.",
-            workflow_run_status=workflow_run.status,
-            workflow_run_id=workflow_run_id,
-            organization_id=organization_id,
-        )
+        if LOG.isEnabledFor("info"):
+            LOG.info(
+                "Workflow run is not running.",
+                workflow_run_status=workflow_run.status,
+                workflow_run_id=workflow_run_id,
+                organization_id=organization_id,
+            )
 
         return None, None
 
@@ -200,19 +204,21 @@ async def verify_workflow_run(
     )
 
     if not browser_session:
-        LOG.info(
-            "No browser session found for workflow run.",
-            workflow_run_id=workflow_run_id,
-            organization_id=organization_id,
-        )
+        if LOG.isEnabledFor("info"):
+            LOG.info(
+                "No browser session found for workflow run.",
+                workflow_run_id=workflow_run_id,
+                organization_id=organization_id,
+            )
         return workflow_run, None
 
     browser_address = browser_session.browser_address
 
     if not browser_address:
-        LOG.info(
-            "Waiting for browser session address.", workflow_run_id=workflow_run_id, organization_id=organization_id
-        )
+        if LOG.isEnabledFor("info"):
+            LOG.info(
+                "Waiting for browser session address.", workflow_run_id=workflow_run_id, organization_id=organization_id
+            )
 
         try:
             browser_address = await app.PERSISTENT_SESSIONS_MANAGER.get_browser_address(
@@ -220,12 +226,13 @@ async def verify_workflow_run(
                 organization_id=organization_id,
             )
         except Exception as ex:
-            LOG.info(
-                "Browser session address not found for workflow run.",
-                workflow_run_id=workflow_run_id,
-                organization_id=organization_id,
-                ex=ex,
-            )
+            if LOG.isEnabledFor("info"):
+                LOG.info(
+                    "Browser session address not found for workflow run.",
+                    workflow_run_id=workflow_run_id,
+                    organization_id=organization_id,
+                    ex=ex,
+                )
             return workflow_run, None
 
     try:
