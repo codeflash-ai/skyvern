@@ -1,22 +1,22 @@
 import asyncio
 from typing import TYPE_CHECKING, Any, Pattern, overload
 
+from codeflash.verification.codeflash_capture import codeflash_capture
 from playwright.async_api import Page
 
 from skyvern.client import GetRunResponse
 from skyvern.client.types.workflow_run_response import WorkflowRunResponse
 from skyvern.config import settings
-from skyvern.library.constants import DEFAULT_AGENT_HEARTBEAT_INTERVAL, DEFAULT_AGENT_TIMEOUT
+from skyvern.library.constants import (DEFAULT_AGENT_HEARTBEAT_INTERVAL,
+                                       DEFAULT_AGENT_TIMEOUT)
 from skyvern.library.skyvern_browser_page_ai import SdkSkyvernPageAi
 from skyvern.library.skyvern_locator import SkyvernLocator
+from skyvern.schemas.run_blocks import CredentialType
+from skyvern.schemas.runs import RunEngine, RunStatus, TaskRunResponse
 from skyvern.webeye.actions import handler_utils
 
 if TYPE_CHECKING:
     from skyvern.library.skyvern_browser import SkyvernBrowser
-
-from skyvern.schemas.run_blocks import CredentialType
-from skyvern.schemas.runs import RunEngine, RunStatus, TaskRunResponse
-
 
 class SkyvernPageRun:
     """Provides methods to run Skyvern tasks and workflows in the context of a browser page.
@@ -26,26 +26,12 @@ class SkyvernPageRun:
     and pre-defined workflows with automatic waiting for completion.
     """
 
-    def __init__(self, browser: "SkyvernBrowser", page: Page) -> None:
+    @codeflash_capture(function_name='SkyvernPageRun.__init__', tmp_dir_path='/tmp/codeflash__qlo8zvj/test_return_values', tests_root='/home/ubuntu/work/repo/tests/unit_tests', is_fto=True)
+    def __init__(self, browser: 'SkyvernBrowser', page: Page) -> None:
         self._browser = browser
         self._page = page
 
-    async def task(
-        self,
-        prompt: str,
-        engine: RunEngine = RunEngine.skyvern_v2,
-        model: dict[str, Any] | None = None,
-        url: str | None = None,
-        webhook_url: str | None = None,
-        totp_identifier: str | None = None,
-        totp_url: str | None = None,
-        title: str | None = None,
-        error_code_mapping: dict[str, str] | None = None,
-        data_extraction_schema: dict[str, Any] | str | None = None,
-        max_steps: int | None = None,
-        timeout: float = DEFAULT_AGENT_TIMEOUT,
-        user_agent: str | None = None,
-    ) -> TaskRunResponse:
+    async def task(self, prompt: str, engine: RunEngine=RunEngine.skyvern_v2, model: dict[str, Any] | None=None, url: str | None=None, webhook_url: str | None=None, totp_identifier: str | None=None, totp_url: str | None=None, title: str | None=None, error_code_mapping: dict[str, str] | None=None, data_extraction_schema: dict[str, Any] | str | None=None, max_steps: int | None=None, timeout: float=DEFAULT_AGENT_TIMEOUT, user_agent: str | None=None) -> TaskRunResponse:
         """Run a task in the context of this page and wait for it to finish.
 
         Args:
@@ -66,45 +52,12 @@ class SkyvernPageRun:
         Returns:
             TaskRunResponse containing the task execution results.
         """
-
         await self._browser.sdk.ensure_has_server()
-        task_run = await self._browser.client.run_task(
-            prompt=prompt,
-            engine=engine,
-            model=model,
-            url=url or self._get_page_url(),
-            webhook_url=webhook_url,
-            totp_identifier=totp_identifier,
-            totp_url=totp_url,
-            title=title,
-            error_code_mapping=error_code_mapping,
-            data_extraction_schema=data_extraction_schema,
-            max_steps=max_steps,
-            browser_session_id=self._browser.browser_session_id,
-            browser_address=self._browser.browser_address,
-            user_agent=user_agent,
-        )
-
+        task_run = await self._browser.client.run_task(prompt=prompt, engine=engine, model=model, url=url or self._get_page_url(), webhook_url=webhook_url, totp_identifier=totp_identifier, totp_url=totp_url, title=title, error_code_mapping=error_code_mapping, data_extraction_schema=data_extraction_schema, max_steps=max_steps, browser_session_id=self._browser.browser_session_id, browser_address=self._browser.browser_address, user_agent=user_agent)
         task_run = await self._wait_for_run_completion(task_run.run_id, timeout)
         return TaskRunResponse.model_validate(task_run.model_dump())
 
-    async def login(
-        self,
-        credential_type: CredentialType,
-        *,
-        url: str | None = None,
-        credential_id: str | None = None,
-        bitwarden_collection_id: str | None = None,
-        bitwarden_item_id: str | None = None,
-        onepassword_vault_id: str | None = None,
-        onepassword_item_id: str | None = None,
-        prompt: str | None = None,
-        webhook_url: str | None = None,
-        totp_identifier: str | None = None,
-        totp_url: str | None = None,
-        extra_http_headers: dict[str, str] | None = None,
-        timeout: float = DEFAULT_AGENT_TIMEOUT,
-    ) -> WorkflowRunResponse:
+    async def login(self, credential_type: CredentialType, *, url: str | None=None, credential_id: str | None=None, bitwarden_collection_id: str | None=None, bitwarden_item_id: str | None=None, onepassword_vault_id: str | None=None, onepassword_item_id: str | None=None, prompt: str | None=None, webhook_url: str | None=None, totp_identifier: str | None=None, totp_url: str | None=None, extra_http_headers: dict[str, str] | None=None, timeout: float=DEFAULT_AGENT_TIMEOUT) -> WorkflowRunResponse:
         """Run a login task in the context of this page and wait for it to finish.
 
         Args:
@@ -125,39 +78,12 @@ class SkyvernPageRun:
         Returns:
             WorkflowRunResponse containing the login workflow execution results.
         """
-
         await self._browser.sdk.ensure_has_server()
-        workflow_run = await self._browser.client.login(
-            credential_type=credential_type,
-            url=url or self._get_page_url(),
-            credential_id=credential_id,
-            bitwarden_collection_id=bitwarden_collection_id,
-            bitwarden_item_id=bitwarden_item_id,
-            onepassword_vault_id=onepassword_vault_id,
-            onepassword_item_id=onepassword_item_id,
-            prompt=prompt,
-            webhook_url=webhook_url,
-            totp_identifier=totp_identifier,
-            totp_url=totp_url,
-            browser_session_id=self._browser.browser_session_id,
-            browser_address=self._browser.browser_address,
-            extra_http_headers=extra_http_headers,
-        )
-
+        workflow_run = await self._browser.client.login(credential_type=credential_type, url=url or self._get_page_url(), credential_id=credential_id, bitwarden_collection_id=bitwarden_collection_id, bitwarden_item_id=bitwarden_item_id, onepassword_vault_id=onepassword_vault_id, onepassword_item_id=onepassword_item_id, prompt=prompt, webhook_url=webhook_url, totp_identifier=totp_identifier, totp_url=totp_url, browser_session_id=self._browser.browser_session_id, browser_address=self._browser.browser_address, extra_http_headers=extra_http_headers)
         workflow_run = await self._wait_for_run_completion(workflow_run.run_id, timeout)
         return WorkflowRunResponse.model_validate(workflow_run.model_dump())
 
-    async def workflow(
-        self,
-        workflow_id: str,
-        parameters: dict[str, Any] | None = None,
-        template: bool | None = None,
-        title: str | None = None,
-        webhook_url: str | None = None,
-        totp_url: str | None = None,
-        totp_identifier: str | None = None,
-        timeout: float = DEFAULT_AGENT_TIMEOUT,
-    ) -> WorkflowRunResponse:
+    async def workflow(self, workflow_id: str, parameters: dict[str, Any] | None=None, template: bool | None=None, title: str | None=None, webhook_url: str | None=None, totp_url: str | None=None, totp_identifier: str | None=None, timeout: float=DEFAULT_AGENT_TIMEOUT) -> WorkflowRunResponse:
         """Run a workflow in the context of this page and wait for it to finish.
 
         Args:
@@ -173,20 +99,8 @@ class SkyvernPageRun:
         Returns:
             WorkflowRunResponse containing the workflow execution results.
         """
-
         await self._browser.sdk.ensure_has_server()
-        workflow_run = await self._browser.client.run_workflow(
-            workflow_id=workflow_id,
-            parameters=parameters,
-            template=template,
-            title=title,
-            webhook_url=webhook_url,
-            totp_url=totp_url,
-            totp_identifier=totp_identifier,
-            browser_session_id=self._browser.browser_session_id,
-            browser_address=self._browser.browser_address,
-        )
-
+        workflow_run = await self._browser.client.run_workflow(workflow_id=workflow_id, parameters=parameters, template=template, title=title, webhook_url=webhook_url, totp_url=totp_url, totp_identifier=totp_identifier, browser_session_id=self._browser.browser_session_id, browser_address=self._browser.browser_address)
         workflow_run = await self._wait_for_run_completion(workflow_run.run_id, timeout)
         return WorkflowRunResponse.model_validate(workflow_run.model_dump())
 
@@ -201,10 +115,9 @@ class SkyvernPageRun:
 
     def _get_page_url(self) -> str | None:
         url = self._page.url
-        if url == "about:blank":
+        if url == 'about:blank':
             return None
         return url
-
 
 class SkyvernBrowserPage:
     """A browser page wrapper that combines Playwright's page API with Skyvern's AI capabilities.
@@ -229,45 +142,21 @@ class SkyvernBrowserPage:
         run: SkyvernPageRun instance for executing AI-powered tasks and workflows.
     """
 
-    def __init__(self, browser: "SkyvernBrowser", page: Page):
+    def __init__(self, browser: 'SkyvernBrowser', page: Page):
         self._browser = browser
         self._page = page
         self._ai = SdkSkyvernPageAi(browser, page)
         self.run = SkyvernPageRun(browser, page)
 
     @overload
-    async def click(
-        self,
-        selector: str,
-        *,
-        prompt: str | None = None,
-        ai: str | None = "fallback",
-        data: str | dict[str, Any] | None = None,
-        timeout: float = settings.BROWSER_ACTION_TIMEOUT_MS,
-        **kwargs: Any,
-    ) -> str | None: ...
+    async def click(self, selector: str, *, prompt: str | None=None, ai: str | None='fallback', data: str | dict[str, Any] | None=None, timeout: float=settings.BROWSER_ACTION_TIMEOUT_MS, **kwargs: Any) -> str | None:
+        ...
 
     @overload
-    async def click(
-        self,
-        *,
-        prompt: str,
-        ai: str | None = "fallback",
-        data: str | dict[str, Any] | None = None,
-        timeout: float = settings.BROWSER_ACTION_TIMEOUT_MS,
-        **kwargs: Any,
-    ) -> str | None: ...
+    async def click(self, *, prompt: str, ai: str | None='fallback', data: str | dict[str, Any] | None=None, timeout: float=settings.BROWSER_ACTION_TIMEOUT_MS, **kwargs: Any) -> str | None:
+        ...
 
-    async def click(
-        self,
-        selector: str | None = None,
-        *,
-        prompt: str | None = None,
-        ai: str | None = "fallback",
-        data: str | dict[str, Any] | None = None,
-        timeout: float = settings.BROWSER_ACTION_TIMEOUT_MS,
-        **kwargs: Any,
-    ) -> str | None:
+    async def click(self, selector: str | None=None, *, prompt: str | None=None, ai: str | None='fallback', data: str | dict[str, Any] | None=None, timeout: float=settings.BROWSER_ACTION_TIMEOUT_MS, **kwargs: Any) -> str | None:
         """Click an element using a CSS selector, AI-powered prompt matching, or both.
 
         This method supports three modes:
@@ -297,9 +186,7 @@ class SkyvernBrowserPage:
             await page.click("#open-invoice-button", prompt="Click on the 'Open Invoice' button")
             ```
         """
-
-        if ai == "fallback":
-            # try to click the element with the original selector first
+        if ai == 'fallback':
             error_to_raise = None
             if selector:
                 try:
@@ -308,73 +195,29 @@ class SkyvernBrowserPage:
                     return selector
                 except Exception as e:
                     error_to_raise = e
-
-            # if the original selector doesn't work, try to click the element with the ai generated selector
             if prompt:
-                return await self._ai.ai_click(
-                    selector=selector or "",
-                    intention=prompt,
-                    data=data,
-                    timeout=timeout,
-                )
+                return await self._ai.ai_click(selector=selector or '', intention=prompt, data=data, timeout=timeout)
             if error_to_raise:
                 raise error_to_raise
             else:
                 return selector
-        elif ai == "proactive":
+        elif ai == 'proactive':
             if prompt:
-                return await self._ai.ai_click(
-                    selector=selector or "",
-                    intention=prompt,
-                    data=data,
-                    timeout=timeout,
-                )
-
+                return await self._ai.ai_click(selector=selector or '', intention=prompt, data=data, timeout=timeout)
         if selector:
             locator = self._page.locator(selector, **kwargs)
             await locator.click(timeout=timeout)
         return selector
 
     @overload
-    async def fill(
-        self,
-        selector: str,
-        value: str,
-        *,
-        prompt: str | None = None,
-        ai: str | None = "fallback",
-        data: str | dict[str, Any] | None = None,
-        timeout: float = settings.BROWSER_ACTION_TIMEOUT_MS,
-        totp_identifier: str | None = None,
-        totp_url: str | None = None,
-    ) -> str: ...
+    async def fill(self, selector: str, value: str, *, prompt: str | None=None, ai: str | None='fallback', data: str | dict[str, Any] | None=None, timeout: float=settings.BROWSER_ACTION_TIMEOUT_MS, totp_identifier: str | None=None, totp_url: str | None=None) -> str:
+        ...
 
     @overload
-    async def fill(
-        self,
-        *,
-        prompt: str,
-        value: str | None = None,
-        selector: str | None = None,
-        ai: str | None = "fallback",
-        data: str | dict[str, Any] | None = None,
-        timeout: float = settings.BROWSER_ACTION_TIMEOUT_MS,
-        totp_identifier: str | None = None,
-        totp_url: str | None = None,
-    ) -> str: ...
+    async def fill(self, *, prompt: str, value: str | None=None, selector: str | None=None, ai: str | None='fallback', data: str | dict[str, Any] | None=None, timeout: float=settings.BROWSER_ACTION_TIMEOUT_MS, totp_identifier: str | None=None, totp_url: str | None=None) -> str:
+        ...
 
-    async def fill(
-        self,
-        selector: str | None = None,
-        value: str | None = None,
-        *,
-        prompt: str | None = None,
-        ai: str | None = "fallback",
-        data: str | dict[str, Any] | None = None,
-        timeout: float = settings.BROWSER_ACTION_TIMEOUT_MS,
-        totp_identifier: str | None = None,
-        totp_url: str | None = None,
-    ) -> str:
+    async def fill(self, selector: str | None=None, value: str | None=None, *, prompt: str | None=None, ai: str | None='fallback', data: str | dict[str, Any] | None=None, timeout: float=settings.BROWSER_ACTION_TIMEOUT_MS, totp_identifier: str | None=None, totp_url: str | None=None) -> str:
         """Fill an input field using a CSS selector, AI-powered prompt matching, or both.
 
         This method supports three modes:
@@ -411,16 +254,7 @@ class SkyvernBrowserPage:
             )
             ```
         """
-        return await self._input_text(
-            selector=selector,
-            value=value or "",
-            ai=ai,
-            intention=prompt,
-            data=data,
-            timeout=timeout,
-            totp_identifier=totp_identifier,
-            totp_url=totp_url,
-        )
+        return await self._input_text(selector=selector, value=value or '', ai=ai, intention=prompt, data=data, timeout=timeout, totp_identifier=totp_identifier, totp_url=totp_url)
 
     async def goto(self, url: str, **kwargs: Any) -> None:
         """Navigate to the given URL.
@@ -442,42 +276,14 @@ class SkyvernBrowserPage:
         await self._page.type(selector, text, **kwargs)
 
     @overload
-    async def select_option(
-        self,
-        selector: str,
-        value: str | None = None,
-        *,
-        prompt: str | None = None,
-        ai: str | None = "fallback",
-        data: str | dict[str, Any] | None = None,
-        timeout: float = settings.BROWSER_ACTION_TIMEOUT_MS,
-        **kwargs: Any,
-    ) -> str: ...
+    async def select_option(self, selector: str, value: str | None=None, *, prompt: str | None=None, ai: str | None='fallback', data: str | dict[str, Any] | None=None, timeout: float=settings.BROWSER_ACTION_TIMEOUT_MS, **kwargs: Any) -> str:
+        ...
 
     @overload
-    async def select_option(
-        self,
-        *,
-        prompt: str,
-        value: str | None = None,
-        selector: str | None = None,
-        ai: str | None = "fallback",
-        data: str | dict[str, Any] | None = None,
-        timeout: float = settings.BROWSER_ACTION_TIMEOUT_MS,
-        **kwargs: Any,
-    ) -> str: ...
+    async def select_option(self, *, prompt: str, value: str | None=None, selector: str | None=None, ai: str | None='fallback', data: str | dict[str, Any] | None=None, timeout: float=settings.BROWSER_ACTION_TIMEOUT_MS, **kwargs: Any) -> str:
+        ...
 
-    async def select_option(
-        self,
-        selector: str | None = None,
-        value: str | None = None,
-        *,
-        prompt: str | None = None,
-        ai: str | None = "fallback",
-        data: str | dict[str, Any] | None = None,
-        timeout: float = settings.BROWSER_ACTION_TIMEOUT_MS,
-        **kwargs: Any,
-    ) -> str:
+    async def select_option(self, selector: str | None=None, value: str | None=None, *, prompt: str | None=None, ai: str | None='fallback', data: str | dict[str, Any] | None=None, timeout: float=settings.BROWSER_ACTION_TIMEOUT_MS, **kwargs: Any) -> str:
         """Select an option from a dropdown using a CSS selector, AI-powered prompt matching, or both.
 
         This method supports three modes:
@@ -512,8 +318,8 @@ class SkyvernBrowserPage:
             )
             ```
         """
-        value = value or ""
-        if ai == "fallback":
+        value = value or ''
+        if ai == 'fallback':
             error_to_raise = None
             if selector:
                 try:
@@ -523,38 +329,19 @@ class SkyvernBrowserPage:
                 except Exception as e:
                     error_to_raise = e
             if prompt:
-                return await self._ai.ai_select_option(
-                    selector=selector or "",
-                    value=value,
-                    intention=prompt,
-                    data=data,
-                    timeout=timeout,
-                )
+                return await self._ai.ai_select_option(selector=selector or '', value=value, intention=prompt, data=data, timeout=timeout)
             if error_to_raise:
                 raise error_to_raise
             else:
                 return value
-        elif ai == "proactive" and prompt:
-            return await self._ai.ai_select_option(
-                selector=selector or "",
-                value=value,
-                intention=prompt,
-                data=data,
-                timeout=timeout,
-            )
+        elif ai == 'proactive' and prompt:
+            return await self._ai.ai_select_option(selector=selector or '', value=value, intention=prompt, data=data, timeout=timeout)
         if selector:
             locator = self._page.locator(selector)
             await locator.select_option(value, timeout=timeout, **kwargs)
         return value
 
-    async def extract(
-        self,
-        prompt: str,
-        schema: dict[str, Any] | list | str | None = None,
-        error_code_mapping: dict[str, str] | None = None,
-        intention: str | None = None,
-        data: str | dict[str, Any] | None = None,
-    ) -> dict[str, Any] | list | str | None:
+    async def extract(self, prompt: str, schema: dict[str, Any] | list | str | None=None, error_code_mapping: dict[str, str] | None=None, intention: str | None=None, data: str | dict[str, Any] | None=None) -> dict[str, Any] | list | str | None:
         """Extract structured data from the page using AI.
 
         Args:
@@ -586,10 +373,7 @@ class SkyvernBrowserPage:
         """
         return await self._ai.ai_extract(prompt, schema, error_code_mapping, intention, data)
 
-    async def act(
-        self,
-        prompt: str,
-    ) -> None:
+    async def act(self, prompt: str) -> None:
         """Perform an action on the page using AI based on a natural language prompt.
 
         Args:
@@ -717,17 +501,7 @@ class SkyvernBrowserPage:
         """
         return SkyvernLocator(self._page.get_by_test_id(test_id))
 
-    async def _input_text(
-        self,
-        selector: str | None,
-        value: str,
-        ai: str | None = "fallback",
-        intention: str | None = None,
-        data: str | dict[str, Any] | None = None,
-        totp_identifier: str | None = None,
-        totp_url: str | None = None,
-        timeout: float = settings.BROWSER_ACTION_TIMEOUT_MS,
-    ) -> str:
+    async def _input_text(self, selector: str | None, value: str, ai: str | None='fallback', intention: str | None=None, data: str | dict[str, Any] | None=None, totp_identifier: str | None=None, totp_url: str | None=None, timeout: float=settings.BROWSER_ACTION_TIMEOUT_MS) -> str:
         """Input text into an element identified by ``selector``.
 
         When ``intention`` and ``data`` are provided a new input text action is
@@ -738,9 +512,7 @@ class SkyvernBrowserPage:
         If the prompt generation or parsing fails for any reason we fall back to
         inputting the originally supplied ``value``.
         """
-
-        # format the text with the actual value of the parameter if it's a secret when running a workflow
-        if ai == "fallback":
+        if ai == 'fallback':
             error_to_raise = None
             if selector:
                 try:
@@ -749,35 +521,16 @@ class SkyvernBrowserPage:
                     return value
                 except Exception as e:
                     error_to_raise = e
-
             if intention:
-                return await self._ai.ai_input_text(
-                    selector=selector,
-                    value=value,
-                    intention=intention,
-                    data=data,
-                    totp_identifier=totp_identifier,
-                    totp_url=totp_url,
-                    timeout=timeout,
-                )
+                return await self._ai.ai_input_text(selector=selector, value=value, intention=intention, data=data, totp_identifier=totp_identifier, totp_url=totp_url, timeout=timeout)
             if error_to_raise:
                 raise error_to_raise
             else:
                 return value
-        elif ai == "proactive" and intention:
-            return await self._ai.ai_input_text(
-                selector=selector,
-                value=value,
-                intention=intention,
-                data=data,
-                totp_identifier=totp_identifier,
-                totp_url=totp_url,
-                timeout=timeout,
-            )
-
+        elif ai == 'proactive' and intention:
+            return await self._ai.ai_input_text(selector=selector, value=value, intention=intention, data=data, totp_identifier=totp_identifier, totp_url=totp_url, timeout=timeout)
         if not selector:
-            raise ValueError("Selector is required but was not provided")
-
+            raise ValueError('Selector is required but was not provided')
         locator = self._page.locator(selector)
         await handler_utils.input_sequentially(locator, value, timeout=timeout)
         return value
