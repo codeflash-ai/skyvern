@@ -75,7 +75,9 @@ async def get_messages_for_workflow_run(
     Return a message channel for a workflow run, with a list of loops to run concurrently.
     """
 
-    LOG.info("Getting message channel for workflow run.", workflow_run_id=workflow_run_id)
+    if LOG.isEnabledFor("info"):
+        LOG.info("Getting message channel for workflow run.", workflow_run_id=workflow_run_id)
+
 
     workflow_run, browser_session = await verify_workflow_run(
         workflow_run_id=workflow_run_id,
@@ -83,19 +85,21 @@ async def get_messages_for_workflow_run(
     )
 
     if not workflow_run:
-        LOG.info(
-            "Message channel: no initial workflow run found.",
-            workflow_run_id=workflow_run_id,
-            organization_id=organization_id,
-        )
+        if LOG.isEnabledFor("info"):
+            LOG.info(
+                "Message channel: no initial workflow run found.",
+                workflow_run_id=workflow_run_id,
+                organization_id=organization_id,
+            )
         return None
 
     if not browser_session:
-        LOG.info(
-            "Message channel: no initial browser session found for workflow run.",
-            workflow_run_id=workflow_run_id,
-            organization_id=organization_id,
-        )
+        if LOG.isEnabledFor("info"):
+            LOG.info(
+                "Message channel: no initial browser session found for workflow run.",
+                workflow_run_id=workflow_run_id,
+                organization_id=organization_id,
+            )
         return None
 
     message_channel = sc.MessageChannel(
@@ -106,7 +110,9 @@ async def get_messages_for_workflow_run(
         websocket=websocket,
     )
 
-    LOG.info("Got message channel for workflow run.", message_channel=message_channel)
+    if LOG.isEnabledFor("info"):
+        LOG.info("Got message channel for workflow run.", message_channel=message_channel)
+
 
     loops = [
         asyncio.create_task(loop_verify_workflow_run(message_channel)),
@@ -124,15 +130,18 @@ async def loop_channel(message_channel: sc.MessageChannel) -> None:
     """
 
     if not message_channel.browser_session:
-        LOG.info(
-            "No browser session found for workflow run.",
-            workflow_run=message_channel.workflow_run,
-            organization_id=message_channel.organization_id,
-        )
+        if LOG.isEnabledFor("info"):
+            LOG.info(
+                "No browser session found for workflow run.",
+                workflow_run=message_channel.workflow_run,
+                organization_id=message_channel.organization_id,
+            )
         return
 
     async def frontend_to_backend() -> None:
-        LOG.info("Starting frontend-to-backend channel loop.", message_channel=message_channel)
+        if LOG.isEnabledFor("info"):
+            LOG.info("Starting frontend-to-backend channel loop.", message_channel=message_channel)
+
 
         while message_channel.is_open:
             try:
@@ -189,18 +198,20 @@ async def loop_channel(message_channel: sc.MessageChannel) -> None:
                         continue
 
             except WebSocketDisconnect:
-                LOG.info(
-                    "Frontend disconnected.",
-                    workflow_run=message_channel.workflow_run,
-                    organization_id=message_channel.organization_id,
-                )
+                if LOG.isEnabledFor("info"):
+                    LOG.info(
+                        "Frontend disconnected.",
+                        workflow_run=message_channel.workflow_run,
+                        organization_id=message_channel.organization_id,
+                    )
                 raise
             except ConnectionClosedError:
-                LOG.info(
-                    "Frontend closed the streaming session.",
-                    workflow_run=message_channel.workflow_run,
-                    organization_id=message_channel.organization_id,
-                )
+                if LOG.isEnabledFor("info"):
+                    LOG.info(
+                        "Frontend closed the streaming session.",
+                        workflow_run=message_channel.workflow_run,
+                        organization_id=message_channel.organization_id,
+                    )
                 raise
             except asyncio.CancelledError:
                 pass
@@ -225,11 +236,12 @@ async def loop_channel(message_channel: sc.MessageChannel) -> None:
             organization_id=message_channel.organization_id,
         )
     finally:
-        LOG.info(
-            "Closing the loop channel stream.",
-            workflow_run=message_channel.workflow_run,
-            organization_id=message_channel.organization_id,
-        )
+        if LOG.isEnabledFor("info"):
+            LOG.info(
+                "Closing the loop channel stream.",
+                workflow_run=message_channel.workflow_run,
+                organization_id=message_channel.organization_id,
+            )
         await message_channel.close(reason="loop-channel-closed")
 
 
