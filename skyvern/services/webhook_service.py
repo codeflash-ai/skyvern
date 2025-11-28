@@ -484,6 +484,14 @@ async def _deliver_webhook(
 
 
 def _as_run_type_str(run_type: RunType | str | None) -> str:
+    # Inline logic to avoid repeated isinstance checks
+    if type(run_type) is RunType:
+        return run_type.value
+    elif type(run_type) is str:
+        return run_type
+    elif run_type is None:
+        return "unknown"
+    # If run_type is a RunType subclass or string subclass (edge-case; rare), fall back to isinstance checks
     if isinstance(run_type, RunType):
         return run_type.value
     if isinstance(run_type, str):
