@@ -42,6 +42,13 @@ from skyvern.schemas.webhooks import RunWebhookPreviewResponse, RunWebhookReplay
 from skyvern.services import run_service, task_v2_service
 from skyvern.utils.url_validators import validate_url
 
+_TASK_RUN_TYPES = {
+    RunType.task_v1,
+    RunType.openai_cua,
+    RunType.anthropic_cua,
+    RunType.ui_tars,
+}
+
 LOG = structlog.get_logger()
 
 RESPONSE_BODY_TRUNCATION_LIMIT = 2048
@@ -230,7 +237,8 @@ async def replay_run_webhook(organization_id: str, run_id: str, target_url: str 
     api_key = await _get_api_key(organization_id=organization_id)
     signed_data = generate_skyvern_webhook_signature(payload=payload.payload, api_key=api_key)
 
-    url_to_use: str | None = target_url if target_url else payload.default_webhook_url
+    url_to_use = target_url if target_url is not None else payload.default_webhook_url
+
 
     if not url_to_use:
         raise MissingWebhookTarget()
@@ -259,38 +267,30 @@ async def replay_run_webhook(organization_id: str, run_id: str, target_url: str 
 
 async def _build_webhook_payload(organization_id: str, run_id: str) -> _WebhookPayload:
     run = await app.DATABASE.get_run(run_id, organization_id=organization_id)
-    if not run:
+    if run is None:
+        # Attempt to resolve task v2 runs that may not yet be in the runs table.
         # Attempt to resolve task v2 runs that may not yet be in the runs table.
         task_v2 = await app.DATABASE.get_task_v2(run_id, organization_id=organization_id)
-        if task_v2:
+        if task_v2 is not None:
             return await _build_task_v2_payload(task_v2)
-        workflow_run = await app.DATABASE.get_workflow_run(
-            workflow_run_id=run_id,
-            organization_id=organization_id,
-        )
-        if workflow_run:
-            return await _build_workflow_payload(
-                organization_id=organization_id,
-                workflow_run_id=run_id,
+        else:
+            workflow_run = await app.DATABASE.get_workflow_run(workflow_run_id=run_id, organization_id=organization_id)
+            if workflow_run is not None:
+                return await _build_workflow_payload(organization_id=organization_id, workflow_run_id=run_id)
+            raise SkyvernHTTPException(
+                f"Run {run_id} not found",
+                status_code=status.HTTP_404_NOT_FOUND,
             )
-        raise SkyvernHTTPException(
-            f"Run {run_id} not found",
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
 
     run_type = _as_run_type_str(run.task_run_type)
-    if run.task_run_type in {
-        RunType.task_v1,
-        RunType.openai_cua,
-        RunType.anthropic_cua,
-        RunType.ui_tars,
-    }:
+    run_type_value = run.task_run_type
+    if run_type_value in _TASK_RUN_TYPES:
         return await _build_task_payload(
             organization_id=organization_id,
             run_id=run.run_id,
             run_type_str=run_type,
         )
-    if run.task_run_type == RunType.task_v2:
+    elif run_type_value == RunType.task_v2:
         task_v2 = await app.DATABASE.get_task_v2(run.run_id, organization_id=organization_id)
         if not task_v2:
             raise SkyvernHTTPException(
@@ -298,7 +298,7 @@ async def _build_webhook_payload(organization_id: str, run_id: str) -> _WebhookP
                 status_code=status.HTTP_404_NOT_FOUND,
             )
         return await _build_task_v2_payload(task_v2)
-    if run.task_run_type == RunType.workflow_run:
+    elif run_type_value == RunType.workflow_run:
         return await _build_workflow_payload(organization_id=organization_id, workflow_run_id=run.run_id)
 
     raise WebhookReplayError(f"Run type {run_type} is not supported for webhook replay.")
@@ -456,9 +456,10 @@ async def _deliver_webhook(
     url: str, payload: str, headers: dict[str, str]
 ) -> tuple[int | None, int, str | None, str | None]:
     start = perf_counter()
-    status_code: int | None = None
-    response_body: str | None = None
-    error: str | None = None
+    status_code = None
+    response_body = None
+    error = None
+
 
     try:
         async with httpx.AsyncClient() as client:
