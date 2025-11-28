@@ -20,6 +20,8 @@ from skyvern.exceptions import DownloadFileMaxSizeExceeded, DownloadFileMaxWaiti
 from skyvern.forge.sdk.api.aws import AsyncAWSClient, aws_client
 from skyvern.utils.url_validators import encode_url
 
+_mime_types_cache = {}
+
 LOG = structlog.get_logger()
 
 
@@ -65,8 +67,13 @@ def extract_google_drive_file_id(url: str) -> str | None:
 
 
 def is_valid_mime_type(file_path: str) -> bool:
+    # Use a local cache to avoid repeated mimetypes.guess_type calls for same file_path
+    if file_path in _mime_types_cache:
+        return _mime_types_cache[file_path]
     mime_type, _ = mimetypes.guess_type(file_path)
-    return mime_type is not None
+    result = mime_type is not None
+    _mime_types_cache[file_path] = result
+    return result
 
 
 async def download_file(url: str, max_size_mb: int | None = None) -> str:
