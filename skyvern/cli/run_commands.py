@@ -61,14 +61,18 @@ async def skyvern_run_task(prompt: str, url: str) -> dict[str, Any]:
 
 def get_pids_on_port(port: int) -> List[int]:
     """Return a list of PIDs listening on the given port."""
-    pids = []
+    # Use a set directly to avoid appending then converting to set
+    pids = set()
     try:
         for conn in psutil.net_connections(kind="inet"):
-            if conn.laddr and conn.laddr.port == port and conn.pid:
-                pids.append(conn.pid)
+            laddr = conn.laddr
+            if laddr and laddr.port == port:
+                pid = conn.pid
+                if pid:
+                    pids.add(pid)
     except Exception:
         pass
-    return list(set(pids))
+    return list(pids)
 
 
 def kill_pids(pids: List[int]) -> None:
