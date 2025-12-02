@@ -32,15 +32,12 @@ def convert_file_dict_to_httpx_tuples(
     approach (which also works for non-lists)
     https://github.com/encode/httpx/pull/1032
     """
-
-    httpx_tuples = []
-    for key, file_like in d.items():
-        if isinstance(file_like, list):
-            for file_like_item in file_like:
-                httpx_tuples.append((key, file_like_item))
-        else:
-            httpx_tuples.append((key, file_like))
-    return httpx_tuples
+    # Use list comprehension to flatten with fewer Python function calls
+    return [
+        (key, file_like_item)
+        for key, file_like in d.items()
+        for file_like_item in (file_like if isinstance(file_like, list) else [file_like])
+    ]
 
 
 def with_content_type(*, file: File, default_content_type: str) -> File:
