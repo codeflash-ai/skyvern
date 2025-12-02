@@ -59,6 +59,8 @@ from skyvern.webeye.browser_factory import BrowserState
 from skyvern.webeye.scraper.scraper import ScrapedPage, scrape_website
 from skyvern.webeye.utils.page import SkyvernFrame
 
+_FINAL_STATUSES = (TaskV2Status.completed, TaskV2Status.failed, TaskV2Status.terminated)
+
 LOG = structlog.get_logger()
 DEFAULT_WORKFLOW_TITLE = "New Workflow"
 RANDOM_STRING_POOL = string.ascii_letters + string.digits
@@ -1482,11 +1484,12 @@ async def _update_task_v2_status(
     task_v2 = await app.DATABASE.update_task_v2(
         task_v2_id, organization_id=organization_id, status=status, summary=summary, output=output
     )
-    if status in [TaskV2Status.completed, TaskV2Status.failed, TaskV2Status.terminated]:
-        start_time = (
-            task_v2.started_at.replace(tzinfo=UTC) if task_v2.started_at else task_v2.created_at.replace(tzinfo=UTC)
-        )
-        queued_seconds = (start_time - task_v2.created_at.replace(tzinfo=UTC)).total_seconds()
+    if status in _FINAL_STATUSES:
+        created_at_utc = task_v2.created_at.replace(tzinfo=UTC)
+        started_at_val = task_v2.started_at
+        # Only perform .replace if needed, then reuse computed value
+        start_time = started_at_val.replace(tzinfo=UTC) if started_at_val else created_at_utc
+        queued_seconds = (start_time - created_at_utc).total_seconds()
         duration_seconds = (datetime.now(UTC) - start_time).total_seconds()
         LOG.info(
             "Task v2 duration metrics",
