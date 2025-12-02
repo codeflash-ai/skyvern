@@ -51,8 +51,5 @@ def single_query_encoder(query_key: str, query_value: Any) -> List[Tuple[str, An
 def encode_query(query: Optional[Dict[str, Any]]) -> Optional[List[Tuple[str, Any]]]:
     if query is None:
         return None
-
-    encoded_query = []
-    for k, v in query.items():
-        encoded_query.extend(single_query_encoder(k, v))
-    return encoded_query
+    # Use generator expression for direct list creation and efficient flattening
+    return [item for k, v in query.items() for item in single_query_encoder(k, v)]

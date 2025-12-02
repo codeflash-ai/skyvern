@@ -4,8 +4,5 @@ from typing import Any, Dict, Mapping, Optional
 
 
 def remove_none_from_dict(original: Mapping[str, Optional[Any]]) -> Dict[str, Any]:
-    new: Dict[str, Any] = {}
-    for key, value in original.items():
-        if value is not None:
-            new[key] = value
-    return new
+    # Use dict comprehension for minimal allocation
+    return {k: v for k, v in original.items() if v is not None}

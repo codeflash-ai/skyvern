@@ -18,6 +18,8 @@ from .remove_none_from_dict import remove_none_from_dict
 from .request_options import RequestOptions
 from httpx._types import RequestFiles
 
+_RETRYABLE_400S = {429, 408, 409}
+
 INITIAL_RETRY_DELAY_SECONDS = 0.5
 MAX_RETRY_DELAY_SECONDS = 10
 MAX_RETRY_DELAY_SECONDS_FROM_HEADER = 30
@@ -85,8 +87,8 @@ def _retry_timeout(response: httpx.Response, retries: int) -> float:
 
 
 def _should_retry(response: httpx.Response) -> bool:
-    retryable_400s = [429, 408, 409]
-    return response.status_code >= 500 or response.status_code in retryable_400s
+    # Use set for O(1) lookup, move constant out of function to avoid repeated allocation
+    return response.status_code >= 500 or response.status_code in _RETRYABLE_400S
 
 
 def remove_omit_from_dict(
@@ -95,11 +97,8 @@ def remove_omit_from_dict(
 ) -> typing.Dict[str, typing.Any]:
     if omit is None:
         return original
-    new: typing.Dict[str, typing.Any] = {}
-    for key, value in original.items():
-        if value is not omit:
-            new[key] = value
-    return new
+    # Use dict comprehension for speed, avoids explicit Python loop where safe
+    return {k: v for k, v in original.items() if v is not omit}
 
 
 def maybe_filter_request_body(
