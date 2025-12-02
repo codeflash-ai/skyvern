@@ -93,7 +93,7 @@ class AsyncRawScriptsClient:
             Successful Response
         """
         _response = await self._client_wrapper.httpx_client.request(
-            f"v1/scripts/{jsonable_encoder(script_id)}/run",
+            f"v1/scripts/{script_id}/run",
             method="POST",
             request_options=request_options,
         )
@@ -101,26 +101,25 @@ class AsyncRawScriptsClient:
             if _response is None or not _response.text.strip():
                 return AsyncHttpResponse(response=_response, data=None)
             if 200 <= _response.status_code < 300:
-                _data = typing.cast(
-                    typing.Optional[typing.Any],
-                    parse_obj_as(
-                        type_=typing.Optional[typing.Any],  # type: ignore
-                        object_=_response.json(),
-                    ),
-                )
-                return AsyncHttpResponse(response=_response, data=_data)
+                # Avoid using parse_obj_as for typing.Any: just use json()
+                try:
+                    response_data = _response.json()
+                except JSONDecodeError:
+                    raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+                return AsyncHttpResponse(response=_response, data=response_data)
             if _response.status_code == 422:
+                try:
+                    response_data = _response.json()
+                except JSONDecodeError:
+                    raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
-                    body=typing.cast(
-                        typing.Optional[typing.Any],
-                        parse_obj_as(
-                            type_=typing.Optional[typing.Any],  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
+                    body=response_data,
                 )
-            _response_json = _response.json()
+            try:
+                _response_json = _response.json()
+            except JSONDecodeError:
+                raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
         except JSONDecodeError:
             raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
