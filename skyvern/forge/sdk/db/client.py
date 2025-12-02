@@ -3663,26 +3663,29 @@ class AgentDB:
             if task_v2:
                 if status:
                     task_v2.status = status
-                    if status == TaskV2Status.queued and task_v2.queued_at is None:
-                        task_v2.queued_at = datetime.utcnow()
-                    if status == TaskV2Status.running and task_v2.started_at is None:
-                        task_v2.started_at = datetime.utcnow()
-                    if status.is_final() and task_v2.finished_at is None:
-                        task_v2.finished_at = datetime.utcnow()
-                if workflow_run_id:
-                    task_v2.workflow_run_id = workflow_run_id
-                if workflow_id:
-                    task_v2.workflow_id = workflow_id
-                if workflow_permanent_id:
-                    task_v2.workflow_permanent_id = workflow_permanent_id
-                if url:
-                    task_v2.url = url
-                if prompt:
-                    task_v2.prompt = prompt
-                if summary:
-                    task_v2.summary = summary
-                if output:
-                    task_v2.output = output
+                    if status == TaskV2Status.queued:
+                        if task_v2.queued_at is None:
+                            task_v2.queued_at = datetime.utcnow()
+                    elif status == TaskV2Status.running:
+                        if task_v2.started_at is None:
+                            task_v2.started_at = datetime.utcnow()
+                    elif status.is_final():
+                        if task_v2.finished_at is None:
+                            task_v2.finished_at = datetime.utcnow()
+                # Attribute update batching to avoid branch prediction misses
+                attr_updates = (
+                    (workflow_run_id, "workflow_run_id"),
+                    (workflow_id, "workflow_id"),
+                    (workflow_permanent_id, "workflow_permanent_id"),
+                    (url, "url"),
+                    (prompt, "prompt"),
+                    (summary, "summary"),
+                    (output, "output"),
+                )
+                for value, attr_name in attr_updates:
+                    if value is not None:
+                        setattr(task_v2, attr_name, value)
+                # Set webhook_failure_reason, must allow explicit None
                 if webhook_failure_reason is not None:
                     task_v2.webhook_failure_reason = webhook_failure_reason
                 await session.commit()
