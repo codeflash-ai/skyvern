@@ -199,10 +199,8 @@ class AsyncAWSClient:
     async def download_file(self, uri: str, log_exception: bool = True) -> bytes | None:
         # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3/client/get_object.html
         try:
+            parsed_uri = S3Uri(uri)
             async with self._s3_client() as client:
-                parsed_uri = S3Uri(uri)
-
-                # Get full object including body
                 response = await client.get_object(Bucket=parsed_uri.bucket, Key=parsed_uri.key)
                 return await response["Body"].read()
         except Exception:
