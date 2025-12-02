@@ -15,6 +15,8 @@ from skyvern.utils.env_paths import resolve_backend_env_path
 
 from .console import console
 
+_WINDSURF_CONFIG_PATH = os.path.expanduser("~/.codeium/windsurf/mcp_config.json")
+
 
 async def setup_local_organization() -> str:
     skyvern_agent = Skyvern(base_url=settings.SKYVERN_BASE_URL, api_key=settings.SKYVERN_API_KEY)
@@ -59,7 +61,7 @@ def get_cursor_config_path(host_system: str) -> str:
 
 
 def get_windsurf_config_path(host_system: str) -> str:
-    return os.path.expanduser("~/.codeium/windsurf/mcp_config.json")
+    return _WINDSURF_CONFIG_PATH
 
 
 # ----- Setup Helpers -----
