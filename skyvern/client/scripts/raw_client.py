@@ -44,13 +44,8 @@ class RawScriptsClient:
             if _response is None or not _response.text.strip():
                 return HttpResponse(response=_response, data=None)
             if 200 <= _response.status_code < 300:
-                _data = typing.cast(
-                    typing.Optional[typing.Any],
-                    parse_obj_as(
-                        type_=typing.Optional[typing.Any],  # type: ignore
-                        object_=_response.json(),
-                    ),
-                )
+                # Directly return parsed JSON for Any type, bypassing parse_obj_as
+                _data = _response.json()
                 return HttpResponse(response=_response, data=_data)
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
