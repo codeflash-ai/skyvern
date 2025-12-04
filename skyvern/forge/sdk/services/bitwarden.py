@@ -169,18 +169,17 @@ class BitwardenService:
 
     @staticmethod
     def _extract_session_key(unlock_cmd_output: str) -> str | None:
-        # Split the text by lines
-        lines = unlock_cmd_output.split("\n")
-
-        # Look for the line containing the BW_SESSION
-        for line in lines:
-            if 'BW_SESSION="' in line:
-                # Find the start and end positions of the session key
-                start = line.find('BW_SESSION="') + len('BW_SESSION="')
-                end = line.rfind('"', start)
-                return line[start:end]
-
-        return None
+        # Optimize by searching directly for BW_SESSION=" and extracting within a single pass
+        bw_marker = 'BW_SESSION="'
+        marker_len = len(bw_marker)
+        pos = unlock_cmd_output.find(bw_marker)
+        if pos == -1:
+            return None
+        # Fast seek for next double-quote after BW_SESSION="
+        end = unlock_cmd_output.find('"', pos + marker_len)
+        if end == -1:
+            return None
+        return unlock_cmd_output[pos + marker_len:end]
 
     @staticmethod
     async def get_secret_value_from_url(
