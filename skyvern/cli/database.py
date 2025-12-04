@@ -1,3 +1,4 @@
+import os
 import shutil
 import subprocess
 import time
@@ -11,7 +12,27 @@ from .console import console
 
 
 def command_exists(command: str) -> bool:
-    return shutil.which(command) is not None
+    # Fast path: Avoids the overhead of shutil.which by inlining the logic
+    path = os.environ.get("PATH", "")
+    if not path:
+        return False
+    # On Windows, for PATHEXT
+    pathext = os.environ.get("PATHEXT", "").split(os.pathsep) if os.name == "nt" else ['']
+    # Use list to avoid repeatedly splitting PATH in a loop
+    paths = path.split(os.pathsep)
+    # Quick check for absolute or relative path provided
+    if os.path.dirname(command):
+        files = [command + ext if not command.lower().endswith(ext.lower()) else command for ext in pathext]
+        for file in files:
+            if os.path.isfile(file) and os.access(file, os.X_OK):
+                return True
+        return False
+    for directory in paths:
+        for ext in pathext:
+            full_path = os.path.join(directory, command + ext) if ext and not command.lower().endswith(ext.lower()) else os.path.join(directory, command)
+            if os.path.isfile(full_path) and os.access(full_path, os.X_OK):
+                return True
+    return False
 
 
 def run_command(command: str, check: bool = True) -> tuple[Optional[str], Optional[int]]:
