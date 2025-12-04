@@ -1,3 +1,4 @@
+import functools
 import json
 from datetime import datetime
 from typing import Any
@@ -21,7 +22,14 @@ class SkyvernLogEncoder:
 
     @classmethod
     def _format_value(cls, value: Any) -> str:
-        return SkyvernJSONLogEncoder.dumps(value, sort_keys=True)
+        # Add simple caching for repeated values. Only hashable values are cached.
+        try:
+            # Only cache immutable values, since mutable objects might change between calls
+            # Values that are not hashable will raise TypeError
+            return _cached_skyvern_json_dump(value)
+        except TypeError:
+            # Fallback for unhashable types (e.g., dict, list)
+            return SkyvernJSONLogEncoder.dumps(value, sort_keys=True)
 
     @staticmethod
     def _parse_json_entry(entry: dict[str, Any]) -> dict[str, Any]:
@@ -81,3 +89,8 @@ class SkyvernLogEncoder:
                 formatted_lines.append(encoder.renderer(None, None, error_entry))
 
         return "\n".join(formatted_lines)
+
+@functools.lru_cache(maxsize=128)
+def _cached_skyvern_json_dump(value: Any) -> str:
+    # For immutable/hashable values only
+    return SkyvernJSONLogEncoder.dumps(value, sort_keys=True)
