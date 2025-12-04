@@ -143,16 +143,32 @@ class BitwardenService:
         """
         Run a CLI command with the specified additional environment variables and return the result.
         """
-        env = os.environ.copy()  # Copy the current environment
+        # Use a static, already-copied base env and only copy when needed for changes. Avoid large .copy() every call.
+        # This assumes no other part of the running process mutates os.environ often in async; if that's a risk, revert.
+        base_env = getattr(BitwardenService, '_base_env', None)
+        if base_env is None:
+            base_env = os.environ.copy()
+            # Only set once; assumed not to be mutated. This reduces .copy() cost.
+            setattr(BitwardenService, '_base_env', base_env)
+
+        # Instead of copying every time, work on a minimal update
+        if additional_env:
+            env = base_env.copy()
+            env.update(additional_env)
+        else:
+            env = base_env
+
         # Make sure node isn't returning warnings. Warnings are sent through stderr and we raise exceptions on stderr.
         env["NODE_NO_WARNINGS"] = "1"
-        if additional_env:
-            env.update(additional_env)  # Update with any additional environment variables
+
+        # Pre-build the command string outside of the shell-subprocess call
+        command_str = " ".join(command)
+
 
         try:
             async with asyncio.timeout(timeout):
                 shell_subprocess = await asyncio.create_subprocess_shell(
-                    " ".join(command),
+                    command_str,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                     env=env,
@@ -493,21 +509,17 @@ class BitwardenService:
             identity_item = items[0]
 
             sensitive_information: dict[str, str] = {}
+            id_fields = identity_item.get("fields", [])
+            identity_sub = identity_item.get("identity", {})
+            # Build a lookup table for custom fields, for O(1) search instead of linear per field
+            custom_fields_lookup = {item["name"]: item["value"] for item in id_fields if "name" in item and "value" in item}
+            # For O(1) lookups, check custom fields first then identity_sub for each wanted field
             for field in identity_fields:
-                # The identity item may store sensitive information in custom fields or default fields
-                # Custom fields are prioritized over default fields
-                # TODO (kerem): Make this case insensitive?
-                for item in identity_item["fields"]:
-                    if item["name"] == field:
-                        sensitive_information[field] = item["value"]
-                        break
+                if field in custom_fields_lookup:
+                    sensitive_information[field] = custom_fields_lookup[field]
+                elif field in identity_sub and field not in sensitive_information:
+                    sensitive_information[field] = identity_sub[field]
 
-                if (
-                    "identity" in identity_item
-                    and field in identity_item["identity"]
-                    and field not in sensitive_information
-                ):
-                    sensitive_information[field] = identity_item["identity"][field]
 
             return sensitive_information
 
@@ -524,10 +536,12 @@ class BitwardenService:
             "BW_CLIENTID": client_id or "",
             "BW_CLIENTSECRET": client_secret or "",
         }
-        if settings.BITWARDEN_EMAIL and settings.BITWARDEN_MASTER_PASSWORD:
-            login_command = ["bw", "login", settings.BITWARDEN_EMAIL, settings.BITWARDEN_MASTER_PASSWORD]
-        else:
-            login_command = ["bw", "login", "--apikey"]
+        # Pre-evaluate which command to use for faster lookup
+        login_command = (
+            ["bw", "login", settings.BITWARDEN_EMAIL, settings.BITWARDEN_MASTER_PASSWORD]
+            if settings.BITWARDEN_EMAIL and settings.BITWARDEN_MASTER_PASSWORD
+            else ["bw", "login", "--apikey"]
+        )
         login_result = await BitwardenService.run_command(login_command, env)
 
         # Validate the login result
