@@ -1,3 +1,4 @@
+import asyncio
 import smtplib
 from email.message import EmailMessage
 
@@ -11,24 +12,28 @@ LOG = structlog.get_logger()
 
 async def _send(*, message: EmailMessage) -> bool:
     settings = SettingsManager.get_settings()
-    try:
-        smtp_host = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT)
 
-        LOG.info("email: Connected to SMTP server")
+    async def send_email_sync() -> bool:
+        try:
+            smtp_host = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT)
+            LOG.info("email: Connected to SMTP server")
 
-        smtp_host.starttls()
-        smtp_host.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+            smtp_host.starttls()
+            smtp_host.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+            LOG.info("email: Logged in to SMTP server")
 
-        LOG.info("email: Logged in to SMTP server")
+            smtp_host.send_message(message)
+            LOG.info("email: Email sent")
+            smtp_host.quit()
+        except Exception as e:
+            LOG.error(
+                "email: Failed to send email", error=str(e), host=settings.SMTP_HOST, port=settings.SMTP_PORT
+            )
+            raise e
+        return True
 
-        smtp_host.send_message(message)
-
-        LOG.info("email: Email sent")
-    except Exception as e:
-        LOG.error("email: Failed to send email", error=str(e), host=settings.SMTP_HOST, port=settings.SMTP_PORT)
-        raise e
-
-    return True
+    # Offload blocking SMTP I/O to thread executor to prevent blocking the event loop
+    return await asyncio.to_thread(send_email_sync)
 
 
 def validate_recipients(recipients: list[str]) -> None:
