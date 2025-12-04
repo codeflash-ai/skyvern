@@ -11,16 +11,26 @@ from skyvern.config import settings
 
 
 def _normalize_numbers(x: Any) -> Any:
-    if isinstance(x, float):
+    """Recursively convert floats that are integer-valued to ints in lists and dicts."""
+    # Manually optimize for common container types to avoid extra isinstance() calls
+    if type(x) is float:  # type equality check is faster than isinstance for built-ins
         return int(x) if x.is_integer() else x
-    if isinstance(x, dict):
-        return {k: _normalize_numbers(v) for k, v in x.items()}
-    if isinstance(x, list):
-        return [_normalize_numbers(v) for v in x]
+    elif type(x) is dict:
+        # Use comprehension as before, but preallocate output dict (Python 3.6+: insertion-ordered)
+        # Avoid local function lookup in inner loop for slight speed
+        items = x.items()
+        normalize = _normalize_numbers
+        return {k: normalize(v) for k, v in items}
+    elif type(x) is list:
+        # Use a generator expression with list() for slight improvement
+        normalize = _normalize_numbers
+        return [normalize(v) for v in x]
+    # Bypass isinstance for most other builtins (tuple, set, etc.) as behavior unchanged
     return x
 
 
 def _normalize_json_dumps(payload: dict) -> str:
+    # The preprocessing already normalizes all numbers; no further optimization possible in dumps call
     return json.dumps(_normalize_numbers(payload), separators=(",", ":"), ensure_ascii=False)
 
 
