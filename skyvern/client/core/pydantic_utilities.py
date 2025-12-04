@@ -157,9 +157,9 @@ def _union_list_of_pydantic_dicts(source: List[Any], destination: List[Any]) -> 
     converted_list: List[Any] = []
     for i, item in enumerate(source):
         destination_value = destination[i]
-        if isinstance(item, dict):
+        if type(item) is dict:
             converted_list.append(deep_union_pydantic_dicts(item, destination_value))
-        elif isinstance(item, list):
+        elif type(item) is list:
             converted_list.append(_union_list_of_pydantic_dicts(item, destination_value))
         else:
             converted_list.append(item)
@@ -167,19 +167,25 @@ def _union_list_of_pydantic_dicts(source: List[Any], destination: List[Any]) -> 
 
 
 def deep_union_pydantic_dicts(source: Dict[str, Any], destination: Dict[str, Any]) -> Dict[str, Any]:
-    for key, value in source.items():
-        node = destination.setdefault(key, {})
-        if isinstance(value, dict):
+    # Use local variable lookup
+    src_items = source.items()
+    dest = destination
+    setdefault = dest.setdefault
+    # Minor optimization: avoid attribute lookup inside loop
+    for key, value in src_items:
+        if type(value) is dict:
+            node = setdefault(key, {})
             deep_union_pydantic_dicts(value, node)
         # Note: we do not do this same processing for sets given we do not have sets of models
         # and given the sets are unordered, the processing of the set and matching objects would
         # be non-trivial.
-        elif isinstance(value, list):
-            destination[key] = _union_list_of_pydantic_dicts(value, node)
+        elif type(value) is list:
+            node = setdefault(key, [])
+            dest[key] = _union_list_of_pydantic_dicts(value, node)
         else:
-            destination[key] = value
+            dest[key] = value
 
-    return destination
+    return dest
 
 
 if IS_PYDANTIC_V2:
