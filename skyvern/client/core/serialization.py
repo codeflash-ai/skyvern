@@ -60,6 +60,9 @@ def convert_and_respect_annotation_metadata(
 
     clean_type = _remove_annotations(inner_type)
     # Pydantic models
+    origin = typing_extensions.get_origin(clean_type)
+
+    # Pydantic models
     if (
         inspect.isclass(clean_type)
         and issubclass(clean_type, pydantic.BaseModel)
@@ -71,12 +74,11 @@ def convert_and_respect_annotation_metadata(
         return _convert_mapping(object_, clean_type, direction)
 
     if (
-        typing_extensions.get_origin(clean_type) == typing.Dict
-        or typing_extensions.get_origin(clean_type) == dict
-        or clean_type == typing.Dict
+        (origin is typing.Dict) or (origin is dict) or (clean_type is typing.Dict)
     ) and isinstance(object_, typing.Dict):
-        key_type = typing_extensions.get_args(clean_type)[0]
-        value_type = typing_extensions.get_args(clean_type)[1]
+        args = typing_extensions.get_args(clean_type)
+        key_type = args[0]
+        value_type = args[1]
 
         return {
             key: convert_and_respect_annotation_metadata(
@@ -88,55 +90,54 @@ def convert_and_respect_annotation_metadata(
             for key, value in object_.items()
         }
 
-    # If you're iterating on a string, do not bother to coerce it to a sequence.
-    if not isinstance(object_, str):
-        if (
-            typing_extensions.get_origin(clean_type) == typing.Set
-            or typing_extensions.get_origin(clean_type) == set
-            or clean_type == typing.Set
-        ) and isinstance(object_, typing.Set):
-            inner_type = typing_extensions.get_args(clean_type)[0]
-            return {
-                convert_and_respect_annotation_metadata(
-                    object_=item,
-                    annotation=annotation,
-                    inner_type=inner_type,
-                    direction=direction,
-                )
-                for item in object_
-            }
-        elif (
-            (
-                typing_extensions.get_origin(clean_type) == typing.List
-                or typing_extensions.get_origin(clean_type) == list
-                or clean_type == typing.List
-            )
-            and isinstance(object_, typing.List)
-        ) or (
-            (
-                typing_extensions.get_origin(clean_type) == typing.Sequence
-                or typing_extensions.get_origin(clean_type) == collections.abc.Sequence
-                or clean_type == typing.Sequence
-            )
-            and isinstance(object_, typing.Sequence)
-        ):
-            inner_type = typing_extensions.get_args(clean_type)[0]
-            return [
-                convert_and_respect_annotation_metadata(
-                    object_=item,
-                    annotation=annotation,
-                    inner_type=inner_type,
-                    direction=direction,
-                )
-                for item in object_
-            ]
+    # Fast exit for str
+    if isinstance(object_, str):
+        annotated_type = _get_annotation(annotation)
+        if annotated_type is None:
+            return object_
+        return object_
 
-    if typing_extensions.get_origin(clean_type) == typing.Union:
-        # We should be able to ~relatively~ safely try to convert keys against all
-        # member types in the union, the edge case here is if one member aliases a field
-        # of the same name to a different name from another member
-        # Or if another member aliases a field of the same name that another member does not.
-        for member in typing_extensions.get_args(clean_type):
+    # Handling Set
+    if (
+        (origin is typing.Set) or (origin is set) or (clean_type is typing.Set)
+    ) and isinstance(object_, typing.Set):
+        inner_type_set = typing_extensions.get_args(clean_type)[0]
+        return {
+            convert_and_respect_annotation_metadata(
+                object_=item,
+                annotation=annotation,
+                inner_type=inner_type_set,
+                direction=direction,
+            )
+            for item in object_
+        }
+    # Handling List/Sequence
+    elif (
+        (
+            (origin is typing.List) or (origin is list) or (clean_type is typing.List)
+        )
+        and isinstance(object_, typing.List)
+    ) or (
+        (
+            (origin is typing.Sequence) or (origin is collections.abc.Sequence) or (clean_type is typing.Sequence)
+        )
+        and isinstance(object_, typing.Sequence)
+    ):
+        inner_type_seq = typing_extensions.get_args(clean_type)[0]
+        return [
+            convert_and_respect_annotation_metadata(
+                object_=item,
+                annotation=annotation,
+                inner_type=inner_type_seq,
+                direction=direction,
+            )
+            for item in object_
+        ]
+
+    # Handling Union
+    if origin is typing.Union:
+        members = typing_extensions.get_args(clean_type)
+        for member in members:
             object_ = convert_and_respect_annotation_metadata(
                 object_=object_,
                 annotation=annotation,
