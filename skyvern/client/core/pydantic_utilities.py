@@ -6,6 +6,7 @@ from collections import defaultdict
 from typing import Any, Callable, ClassVar, Dict, List, Mapping, Optional, Set, Tuple, Type, TypeVar, Union, cast
 
 import pydantic
+from skyvern.client.core.serialization import convert_and_respect_annotation_metadata
 
 IS_PYDANTIC_V2 = pydantic.VERSION.startswith("2.")
 
@@ -78,10 +79,9 @@ class UniversalBaseModel(pydantic.BaseModel):
 
     @classmethod
     def construct(cls: Type["Model"], _fields_set: Optional[Set[str]] = None, **values: Any) -> "Model":
-        dealiased_object = convert_and_respect_annotation_metadata(object_=values, annotation=cls, direction="read")
         if IS_PYDANTIC_V2:
-            return super().model_construct(_fields_set, **dealiased_object)  # type: ignore[misc]
-        return super().construct(_fields_set, **dealiased_object)
+            return super().model_construct(_fields_set, **values)  # type: ignore[misc]
+        return super().construct(_fields_set, **values)
 
     def json(self, **kwargs: Any) -> str:
         kwargs_with_defaults = {
