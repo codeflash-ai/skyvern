@@ -68,9 +68,11 @@ async def aiohttp_get_json(
     raise_exception: bool = True,
     retry_timeout: float = 0,
 ) -> dict[str, Any]:
-    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout)) as session:
-        count = 0
-        while count <= retry:
+    own_session = session is None
+    if own_session:
+        session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout))
+    try:
+        for _ in range(retry + 1):
             try:
                 async with session.get(
                     url,
@@ -88,8 +90,12 @@ async def aiohttp_get_json(
             except Exception:
                 if retry_timeout > 0:
                     await asyncio.sleep(retry_timeout)
-                count += 1
         raise Exception(f"Failed to fetch data from {url}")
+
+
+    finally:
+        if own_session:
+            await session.close()
 
 
 async def aiohttp_get_text(
@@ -139,9 +145,11 @@ async def aiohttp_post(
     raise_exception: bool = True,
     retry_timeout: float = 0,
 ) -> dict[str, Any] | None:
-    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout)) as session:
-        count = 0
-        while count <= retry:
+    own_session = session is None
+    if own_session:
+        session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout))
+    try:
+        for _ in range(retry + 1):
             try:
                 async with session.post(
                     url,
@@ -168,8 +176,10 @@ async def aiohttp_post(
             except Exception:
                 if retry_timeout > 0:
                     await asyncio.sleep(retry_timeout)
-                count += 1
         raise Exception(f"Failed post request url={url}")
+    finally:
+        if own_session:
+            await session.close()
 
 
 async def aiohttp_delete(
