@@ -50,10 +50,12 @@ async def build_message(
 ) -> EmailMessage:
     to = ", ".join(recipients)
     msg = EmailMessage()
-    msg["BCC"] = sender  # BCC the sender so there is a record of the email being sent
-    msg["From"] = sender
-    msg["Subject"] = subject
-    msg["To"] = to
+    msg._headers = [
+        ("BCC", sender),  # BCC the sender so there is a record of the email being sent
+        ("From", sender),
+        ("Subject", subject),
+        ("To", to),
+    ]
     msg.set_content(body)
 
     return msg
