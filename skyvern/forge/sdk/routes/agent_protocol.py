@@ -1248,7 +1248,8 @@ async def get_artifact(
     artifact_id: str,
     current_org: Organization = Depends(org_auth_service.get_current_org),
 ) -> Artifact:
-    analytics.capture("skyvern-oss-artifact-get")
+    # Run analytics capture in background to avoid blocking main async flow
+    asyncio.create_task(asyncio.to_thread(analytics.capture, "skyvern-oss-artifact-get"))
     artifact = await app.DATABASE.get_artifact_by_id(
         artifact_id=artifact_id,
         organization_id=current_org.organization_id,
