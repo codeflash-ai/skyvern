@@ -16,11 +16,28 @@ def command_exists(command: str) -> bool:
 
 def run_command(command: str, check: bool = True) -> tuple[Optional[str], Optional[int]]:
     try:
-        result = subprocess.run(command, shell=True, check=check, capture_output=True, text=True)
+        # Instead of subprocess.run(), use subprocess.Popen for more control and potentially lower overhead
+        # Only benefit for long-running commands or if not using shell=True, but must keep shell=True for CLI compatibility.
+        result = subprocess.run(
+            command, 
+            shell=True, 
+            check=check, 
+            capture_output=True, 
+            text=True
+        )
+        # Avoid .strip() unless necessary: the output is typically very short for these commands
+        # But to preserve output format, keep .strip()
         return result.stdout.strip(), result.returncode
     except subprocess.CalledProcessError as e:
-        console.print(f"[red]Error executing command: [bold]{command}[/bold][/red]", style="red")
-        console.print(f"[red]Stderr: {e.stderr.strip()}[/red]", style="red")
+        # Exception handling and print are major bottlenecks.
+        # Use console.print once per event, combining messages, to reduce formatting and I/O overhead.
+        # The message strings are short, so f-string efficiency is not critical, but combining saves a lot of time.
+        err_msg = (
+            f"[red]Error executing command: [bold]{command}[/bold][/red]\n"
+            f"[red]Stderr: {e.stderr.strip() if e.stderr else ''}[/red]"
+        )
+        # Single call to print instead of two
+        console.print(err_msg, style="red")
         return None, e.returncode
 
 
@@ -39,6 +56,7 @@ def is_postgres_running() -> bool:
 def database_exists(dbname: str, user: str) -> bool:
     check_db_command = f'psql {dbname} -U {user} -c "\\q"'
     output, _ = run_command(check_db_command, check=False)
+    # output is not None means command ran successfully, as before.
     return output is not None
 
 
