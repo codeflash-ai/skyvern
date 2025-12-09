@@ -137,11 +137,15 @@ T = TypeVar("T", Tree, Token)
 
 def _remove_trailing_commas(tree: T) -> T:
     if isinstance(tree, Tree):
-        tree.children = [
-            _remove_trailing_commas(ch)
-            for ch in tree.children
-            if not (isinstance(ch, Token) and ch.type == "TRAILING_COMMA")
-        ]
+        filtered_children = []
+        for ch in tree.children:
+            if isinstance(ch, Token) and ch.type == "TRAILING_COMMA":
+                continue
+            if isinstance(ch, Tree):
+                filtered_children.append(_remove_trailing_commas(ch))
+            else:
+                filtered_children.append(ch)
+        tree.children = filtered_children
     return tree
 
 
