@@ -18,8 +18,9 @@ _server_thread: threading.Thread | None = None
 def _is_port_in_use(port: int) -> bool:
     """Check if a port is already in use."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
-            s.bind(("localhost", port))
+            s.bind(("127.0.0.1", port))
             return False
         except OSError:
             return True
@@ -47,8 +48,12 @@ def _cleanup_on_exit() -> None:
 
 async def _wait_for_server(port: int, timeout: float = 10.0, interval: float = 0.5) -> bool:
     """Wait for the server to become available on the specified port."""
-    start_time = asyncio.get_event_loop().time()
-    while asyncio.get_event_loop().time() - start_time < timeout:
+    loop = asyncio.get_event_loop()
+    now = loop.time
+    start_time = now()
+    end_time = start_time + timeout
+    # Cache the time callable and remove repeated computations for efficiency
+    while now() < end_time:
         if _is_port_in_use(port):
             return True
         await asyncio.sleep(interval)
