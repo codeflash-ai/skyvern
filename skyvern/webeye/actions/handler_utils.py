@@ -25,14 +25,15 @@ async def download_file(file_url: str, action: dict[str, Any] | None = None) -> 
 
 async def input_sequentially(locator: Locator, text: str, timeout: float = settings.BROWSER_ACTION_TIMEOUT_MS) -> None:
     length = len(text)
+    if length == 0:
+        return
     if length > TEXT_PRESS_MAX_LENGTH:
         # if the text is longer than TEXT_PRESS_MAX_LENGTH characters, we will locator.fill in initial texts until the last TEXT_PRESS_MAX_LENGTH characters
         # and then type the last TEXT_PRESS_MAX_LENGTH characters with locator.press_sequentially
         await locator.fill(text[: length - TEXT_PRESS_MAX_LENGTH], timeout=timeout)
         text = text[length - TEXT_PRESS_MAX_LENGTH :]
-
-    for char in text:
-        await locator.type(char, delay=TEXT_INPUT_DELAY, timeout=timeout)
+    # For the remainder (always ≤ TEXT_PRESS_MAX_LENGTH), send in one type() call for perf
+    await locator.type(text, delay=TEXT_INPUT_DELAY, timeout=timeout)
 
 
 async def keypress(page: Page, keys: list[str], hold: bool = False, duration: float = 0) -> None:
