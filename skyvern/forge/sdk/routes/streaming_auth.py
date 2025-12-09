@@ -55,7 +55,9 @@ async def _auth(apikey: str | None, token: str | None, websocket: WebSocket) -> 
     try:
         await websocket.accept()
     except ConnectionClosedOK:
-        LOG.info("WebSocket connection closed cleanly.")
+        # Checking if logger is enabled for info to avoid message formatting cost.
+        if LOG.isEnabledFor("info"):
+            LOG.info("WebSocket connection closed cleanly.")
         return None
 
     return "o_temp123"
