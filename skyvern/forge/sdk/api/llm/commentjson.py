@@ -49,15 +49,25 @@ def detect_encoding(b: bytes) -> str:
     Source can be found at https://bit.ly/2OHqCIK.
     """
 
-    bstartswith = b.startswith
-    if bstartswith((codecs.BOM_UTF32_BE, codecs.BOM_UTF32_LE)):
-        return "utf-32"
-    if bstartswith((codecs.BOM_UTF16_BE, codecs.BOM_UTF16_LE)):
-        return "utf-16"
-    if bstartswith(codecs.BOM_UTF8):
-        return "utf-8-sig"
+    # Avoid allocating tuple every time by using a static tuple
+    # Also, using constants for BOMs to avoid attribute access in inner loop
+    BOM_UTF32_BE = codecs.BOM_UTF32_BE
+    BOM_UTF32_LE = codecs.BOM_UTF32_LE
+    BOM_UTF16_BE = codecs.BOM_UTF16_BE
+    BOM_UTF16_LE = codecs.BOM_UTF16_LE
+    BOM_UTF8 = codecs.BOM_UTF8
 
-    if len(b) >= 4:
+    blen = len(b)
+    # branch on length before using startswith, allows avoiding tuple creation overhead for common cases
+    if blen >= 4:
+        # Only check for UTF-32 BOMs if we have at least 4 bytes
+        if b.startswith(BOM_UTF32_BE) or b.startswith(BOM_UTF32_LE):
+            return "utf-32"
+        if b.startswith(BOM_UTF16_BE) or b.startswith(BOM_UTF16_LE):
+            return "utf-16"
+        if b.startswith(BOM_UTF8):
+            return "utf-8-sig"
+
         if not b[0]:
             # 00 00 -- -- - utf-32-be
             # 00 XX -- -- - utf-16-be
@@ -67,13 +77,24 @@ def detect_encoding(b: bytes) -> str:
             # XX 00 00 XX - utf-16-le
             # XX 00 XX -- - utf-16-le
             return "utf-16-le" if b[2] or b[3] else "utf-32-le"
-    elif len(b) == 2:
+    elif blen == 2:
+        # Only check for UTF-16 BOMs if we have at least 2 bytes
+        if b.startswith(BOM_UTF16_BE) or b.startswith(BOM_UTF16_LE):
+            return "utf-16"
+        if b.startswith(BOM_UTF8):
+            return "utf-8-sig"
+
         if not b[0]:
             # 00 XX - utf-16-be
             return "utf-16-be"
         if not b[1]:
             # XX 00 - utf-16-le
             return "utf-16-le"
+    else:
+        # less than 2 bytes, only UTF-8 BOM can match
+        if b.startswith(BOM_UTF8):
+            return "utf-8-sig"
+
     # default
     return "utf-8"
 
