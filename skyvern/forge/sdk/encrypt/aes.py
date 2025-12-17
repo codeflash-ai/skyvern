@@ -17,17 +17,24 @@ class AES(BaseEncryptor):
         self.salt = hashlib.md5(salt.encode("utf-8")).digest() if salt else default_salt
         self.iv = hashlib.md5(iv.encode("utf-8")).digest() if iv else default_iv
 
+
+        # Precompute derived key for this instance, since secret_key and salt do not change
+        self._derived_key: bytes | None = None
+
     def method(self) -> EncryptMethod:
         return EncryptMethod.AES
 
     def _derive_key(self) -> bytes:
-        kdf = PBKDF2HMAC(
-            algorithm=hashes.SHA256(),
-            length=32,
-            salt=self.salt,
-            iterations=100000,
-        )
-        return kdf.derive(self.secret_key)
+        # Optimization: Cache the key derivation for this instance, since it is expensive and can be reused
+        if self._derived_key is None:
+            kdf = PBKDF2HMAC(
+                algorithm=hashes.SHA256(),
+                length=32,
+                salt=self.salt,
+                iterations=100000,
+            )
+            self._derived_key = kdf.derive(self.secret_key)
+        return self._derived_key
 
     async def encrypt(self, plaintext: str) -> str:
         try:
@@ -55,7 +62,9 @@ class AES(BaseEncryptor):
     def _pad(self, data: bytes) -> bytes:
         block_size = 16
         padding_length = block_size - (len(data) % block_size)
-        padding = bytes([padding_length] * padding_length)
+        # Optimized for both performance and clarity: avoid constructing list object
+        # (bytes(n * [x]) is slower than bytes([x]) * n)
+        padding = bytes([padding_length]) * padding_length
         return data + padding
 
     def _unpad(self, data: bytes) -> bytes:
