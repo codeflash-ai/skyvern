@@ -115,6 +115,15 @@ from skyvern.services import block_service, run_service, task_v1_service, task_v
 from skyvern.services.pdf_import_service import pdf_import_service
 from skyvern.webeye.actions.actions import Action
 
+# Precompute immutable, static values for reuse to reduce allocation/lookup on each call
+_HEARTBEAT_CONTENT: bytes = b"Server is running."
+_HEARTBEAT_HEADERS: dict[str, str] = {"X-Skyvern-API-Version": __version__}
+_HEARTBEAT_RESPONSE: Response = Response(
+    content=_HEARTBEAT_CONTENT,
+    status_code=200,
+    headers=_HEARTBEAT_HEADERS,
+)
+
 LOG = structlog.get_logger()
 
 
@@ -1540,7 +1549,8 @@ async def heartbeat() -> Response:
     """
     Check if the server is running.
     """
-    return Response(content="Server is running.", status_code=200, headers={"X-Skyvern-API-Version": __version__})
+    # Return the prebuilt response instance to minimize allocations and string formatting
+    return _HEARTBEAT_RESPONSE
 
 
 @legacy_base_router.get(
