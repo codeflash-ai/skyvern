@@ -16,18 +16,23 @@ class AES(BaseEncryptor):
         self.secret_key = hashlib.md5(secret_key.encode("utf-8")).digest()
         self.salt = hashlib.md5(salt.encode("utf-8")).digest() if salt else default_salt
         self.iv = hashlib.md5(iv.encode("utf-8")).digest() if iv else default_iv
+        self._cached_key: bytes | None = None
 
     def method(self) -> EncryptMethod:
         return EncryptMethod.AES
 
     def _derive_key(self) -> bytes:
+        if self._cached_key is not None:
+            return self._cached_key
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
             salt=self.salt,
             iterations=100000,
         )
-        return kdf.derive(self.secret_key)
+        key = kdf.derive(self.secret_key)
+        self._cached_key = key
+        return key
 
     async def encrypt(self, plaintext: str) -> str:
         try:
