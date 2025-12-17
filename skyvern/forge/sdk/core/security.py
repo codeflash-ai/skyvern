@@ -11,11 +11,11 @@ from skyvern.config import settings
 
 
 def _normalize_numbers(x: Any) -> Any:
-    if isinstance(x, float):
+    if type(x) is float:
         return int(x) if x.is_integer() else x
-    if isinstance(x, dict):
+    if type(x) is dict:
         return {k: _normalize_numbers(v) for k, v in x.items()}
-    if isinstance(x, list):
+    if type(x) is list:
         return [_normalize_numbers(v) for v in x]
     return x
 
