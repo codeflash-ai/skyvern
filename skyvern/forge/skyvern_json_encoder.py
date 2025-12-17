@@ -6,17 +6,20 @@ class SkyvernJSONLogEncoder(json.JSONEncoder):
     """Custom JSON encoder for Skyvern logs that handles non-serializable objects"""
 
     def default(self, obj: Any) -> Any:
-        if hasattr(obj, "model_dump"):
-            return self._encode_value(obj.model_dump())
+        model_dump = getattr(obj, "model_dump", None)
+        if model_dump is not None and callable(model_dump):
+            return self._encode_value(model_dump())
 
         if hasattr(obj, "__dataclass_fields__"):
             return self._encode_value({k: getattr(obj, k) for k in obj.__dataclass_fields__})
 
-        if hasattr(obj, "to_dict"):
-            return self._encode_value(obj.to_dict())
+        to_dict = getattr(obj, "to_dict", None)
+        if to_dict is not None and callable(to_dict):
+            return self._encode_value(to_dict())
 
-        if hasattr(obj, "asdict"):
-            return self._encode_value(obj.asdict())
+        asdict = getattr(obj, "asdict", None)
+        if asdict is not None and callable(asdict):
+            return self._encode_value(asdict())
 
         if hasattr(obj, "__dict__"):
             return {
@@ -35,13 +38,13 @@ class SkyvernJSONLogEncoder(json.JSONEncoder):
 
     def _encode_value(self, value: Any) -> Any:
         """Helper method to encode nested values recursively"""
-        if isinstance(value, (str, int, float, bool, type(None))):
+        if type(value) in (str, int, float, bool) or value is None:
             return value
 
-        if isinstance(value, (list, tuple)):
+        if type(value) in (list, tuple):
             return [self._encode_value(item) for item in value]
 
-        if isinstance(value, dict):
+        if type(value) is dict:
             return {self._encode_value(k): self._encode_value(v) for k, v in value.items()}
 
         # For any other type, try to encode it using our custom logic
