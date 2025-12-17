@@ -59,6 +59,10 @@ def convert_and_respect_annotation_metadata(
         inner_type = annotation
 
     clean_type = _remove_annotations(inner_type)
+    
+    # Cache origin lookup to avoid repeated calls
+    origin = typing_extensions.get_origin(clean_type)
+    
     # Pydantic models
     if (
         inspect.isclass(clean_type)
@@ -71,10 +75,9 @@ def convert_and_respect_annotation_metadata(
         return _convert_mapping(object_, clean_type, direction)
 
     if (
-        typing_extensions.get_origin(clean_type) == typing.Dict
-        or typing_extensions.get_origin(clean_type) == dict
-        or clean_type == typing.Dict
-    ) and isinstance(object_, typing.Dict):
+        (origin is typing.Dict or origin is dict or clean_type == typing.Dict)
+        and isinstance(object_, typing.Dict)
+    ):
         key_type = typing_extensions.get_args(clean_type)[0]
         value_type = typing_extensions.get_args(clean_type)[1]
 
@@ -91,10 +94,9 @@ def convert_and_respect_annotation_metadata(
     # If you're iterating on a string, do not bother to coerce it to a sequence.
     if not isinstance(object_, str):
         if (
-            typing_extensions.get_origin(clean_type) == typing.Set
-            or typing_extensions.get_origin(clean_type) == set
-            or clean_type == typing.Set
-        ) and isinstance(object_, typing.Set):
+            (origin is typing.Set or origin is set or clean_type == typing.Set)
+            and isinstance(object_, typing.Set)
+        ):
             inner_type = typing_extensions.get_args(clean_type)[0]
             return {
                 convert_and_respect_annotation_metadata(
@@ -107,15 +109,13 @@ def convert_and_respect_annotation_metadata(
             }
         elif (
             (
-                typing_extensions.get_origin(clean_type) == typing.List
-                or typing_extensions.get_origin(clean_type) == list
-                or clean_type == typing.List
+                origin is typing.List or origin is list or clean_type == typing.List
             )
             and isinstance(object_, typing.List)
         ) or (
             (
-                typing_extensions.get_origin(clean_type) == typing.Sequence
-                or typing_extensions.get_origin(clean_type) == collections.abc.Sequence
+                origin is typing.Sequence
+                or origin is collections.abc.Sequence
                 or clean_type == typing.Sequence
             )
             and isinstance(object_, typing.Sequence)
@@ -131,7 +131,7 @@ def convert_and_respect_annotation_metadata(
                 for item in object_
             ]
 
-    if typing_extensions.get_origin(clean_type) == typing.Union:
+    if origin is typing.Union:
         # We should be able to ~relatively~ safely try to convert keys against all
         # member types in the union, the edge case here is if one member aliases a field
         # of the same name to a different name from another member
