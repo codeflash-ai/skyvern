@@ -16,18 +16,13 @@ class AES(BaseEncryptor):
         self.secret_key = hashlib.md5(secret_key.encode("utf-8")).digest()
         self.salt = hashlib.md5(salt.encode("utf-8")).digest() if salt else default_salt
         self.iv = hashlib.md5(iv.encode("utf-8")).digest() if iv else default_iv
+        self._cached_derived_key = self._compute_derived_key()
 
     def method(self) -> EncryptMethod:
         return EncryptMethod.AES
 
     def _derive_key(self) -> bytes:
-        kdf = PBKDF2HMAC(
-            algorithm=hashes.SHA256(),
-            length=32,
-            salt=self.salt,
-            iterations=100000,
-        )
-        return kdf.derive(self.secret_key)
+        return self._cached_derived_key
 
     async def encrypt(self, plaintext: str) -> str:
         try:
@@ -61,3 +56,12 @@ class AES(BaseEncryptor):
     def _unpad(self, data: bytes) -> bytes:
         padding_length = data[-1]
         return data[:-padding_length]
+
+    def _compute_derived_key(self) -> bytes:
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=self.salt,
+            iterations=100000,
+        )
+        return kdf.derive(self.secret_key)
