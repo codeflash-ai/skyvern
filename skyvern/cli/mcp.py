@@ -35,14 +35,16 @@ def get_claude_config_path(host_system: str) -> str:
         if roaming_path is None:
             raise RuntimeError("Could not locate Windows AppData\\Roaming path from WSL")
         return os.path.join(str(roaming_path), "Claude", "claude_desktop_config.json")
-    base_paths = {
-        "darwin": ["~/Library/Application Support/Claude"],
-        "linux": ["~/.config/Claude", "~/.local/share/Claude", "~/Claude"],
-    }
     if host_system == "darwin":
-        return os.path.join(os.path.expanduser(base_paths["darwin"][0]), "claude_desktop_config.json")
+        # Avoids unnecessary dict lookup and keeps only required logic for "darwin"
+        return os.path.join(
+            os.path.expanduser("~/Library/Application Support/Claude"),
+            "claude_desktop_config.json"
+        )
+
     if host_system == "linux":
-        for path in base_paths["linux"]:
+        # Only expanduser and check existence once per path, short-circuit as soon as the first is found
+        for path in ("~/.config/Claude", "~/.local/share/Claude", "~/Claude"):
             full = os.path.expanduser(path)
             if os.path.exists(full):
                 return os.path.join(full, "claude_desktop_config.json")
@@ -106,8 +108,10 @@ def is_cursor_installed(host_system: str) -> bool:
 
 def is_claude_desktop_installed(host_system: str) -> bool:
     try:
-        config_path = os.path.dirname(get_claude_config_path(host_system))
-        return os.path.exists(config_path)
+        # Reduce one os.path.dirname() call by using rsplit which is faster for this use case.
+        config_path = get_claude_config_path(host_system)
+        dir_path = config_path.rsplit(os.sep, 1)[0]
+        return os.path.exists(dir_path)
     except Exception:
         return False
 
