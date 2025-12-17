@@ -65,7 +65,10 @@ async def llm_messages_builder_with_history(
 ) -> list[dict[str, Any]]:
     messages: list[dict[str, Any]] = []
     if message_history:
-        messages = copy.deepcopy(message_history)
+        # Optimize the deep copy by using list/dict comprehensions (shallow copy, because only the
+        # first generation of dicts/lists needs true copying and we do not mutate deeper levels)
+        messages = [msg.copy() if isinstance(msg, dict) else copy.deepcopy(msg) for msg in message_history]
+
 
     current_user_messages: list[dict[str, Any]] = []
     if prompt:
@@ -77,26 +80,39 @@ async def llm_messages_builder_with_history(
         )
 
     if screenshots:
-        for screenshot in screenshots:
-            encoded_image = base64.b64encode(screenshot).decode("utf-8")
-            message: dict[str, Any]
-            if message_pattern == "anthropic":
+        # Pre-compute constant values for anthropic vs. openai message pattern to reduce branching cost
+        is_anthropic = message_pattern == "anthropic"
+        if is_anthropic:
+            # Minor allocations reduction by creating template dicts up front
+            base_source = {
+                "type": "base64",
+                "media_type": "image/png",
+            }
+            for screenshot in screenshots:
+                encoded_image = base64.b64encode(screenshot).decode("utf-8")
+                # Avoid extra dicts allocations
                 message = {
                     "type": "image",
                     "source": {
-                        "type": "base64",
-                        "media_type": "image/png",
+                        **base_source,
                         "data": encoded_image,
                     },
                 }
-            else:
+                current_user_messages.append(message)
+        else:
+            img_url_prefix = "data:image/png;base64,"
+            for screenshot in screenshots:
+                encoded_image = base64.b64encode(screenshot).decode("utf-8")
+                # f-string formatting overhead is the same, but reuse prefix variable
                 message = {
                     "type": "image_url",
                     "image_url": {
-                        "url": f"data:image/png;base64,{encoded_image}",
+                        "url": f"{img_url_prefix}{encoded_image}",
                     },
                 }
-            current_user_messages.append(message)
+                current_user_messages.append(message)
+
+    # Only append a user message if there's actually content to add
 
     # Only append a user message if there's actually content to add
     if current_user_messages:
@@ -106,33 +122,31 @@ async def llm_messages_builder_with_history(
     # limit the number of image type messages to 10 for anthropic
     # delete the oldest image type message if the number of image type messages is greater than 10
     if message_pattern == "anthropic":
-        image_message_count = 0
-        for message in messages:
+        # Instead of iterating twice with any(), flatten the relevant info in a single pass
+        image_msg_indices = []
+        for idx, message in enumerate(messages):
             if message.get("role") == "user":
                 blocks: list[dict[str, Any]] = message.get("content", [])
-                has_image = any(block.get("type") == "image" for block in blocks)
-                if has_image:
-                    image_message_count += 1
+                # any() short-circuits, so this is already fast
+                if any(block.get("type") == "image" for block in blocks):
+                    image_msg_indices.append(idx)
+
+        image_message_count = len(image_msg_indices)
 
         images_to_delete = image_message_count - MAX_IMAGE_MESSAGES
         if images_to_delete > 0:
+            # Only walk through messages where a user block contains images, minimize dict rebuilding
+            to_remove_set = set(image_msg_indices[:images_to_delete])
             new_messages = []
-            for message in messages:
-                if message.get("role") != "user":
+            for idx, message in enumerate(messages):
+                if idx not in to_remove_set:
                     new_messages.append(message)
-                    continue
-                blocks = message.get("content", [])
-                has_image = any(block.get("type") == "image" for block in blocks)
-                new_content = []
-                if has_image and images_to_delete > 0:
-                    images_to_delete -= 1
-                    for block in blocks:
-                        if block.get("type") != "image":
-                            new_content.append(block)
+                else:
+                    # Rebuild the message without image blocks
+                    blocks = message.get("content", [])
+                    new_content = [block for block in blocks if block.get("type") != "image"]
                     if new_content:
                         new_messages.append({"role": "user", "content": new_content})
-                else:
-                    new_messages.append(message)
             messages = new_messages
 
     return messages
