@@ -84,6 +84,16 @@ class UniversalBaseModel(pydantic.BaseModel):
         return super().construct(_fields_set, **dealiased_object)
 
     def json(self, **kwargs: Any) -> str:
+        if not kwargs:
+            if IS_PYDANTIC_V2:
+                return super().model_dump_json(by_alias=True, exclude_unset=True)  # type: ignore[misc]
+            return super().json(by_alias=True, exclude_unset=True)
+        
+        if 'by_alias' not in kwargs and 'exclude_unset' not in kwargs:
+            if IS_PYDANTIC_V2:
+                return super().model_dump_json(by_alias=True, exclude_unset=True, **kwargs)  # type: ignore[misc]
+            return super().json(by_alias=True, exclude_unset=True, **kwargs)
+        
         kwargs_with_defaults = {
             "by_alias": True,
             "exclude_unset": True,
