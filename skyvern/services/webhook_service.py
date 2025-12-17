@@ -484,6 +484,13 @@ async def _deliver_webhook(
 
 
 def _as_run_type_str(run_type: RunType | str | None) -> str:
+    # Inline branch prediction: common path for str and RunType first.
+    # Avoid two isinstance checks in most cases.
+    # This shortcut set reduces overall branch cost.
+    if run_type is None:
+        return "unknown"
+    if type(run_type) is str:
+        return run_type
     if isinstance(run_type, RunType):
         return run_type.value
     if isinstance(run_type, str):
