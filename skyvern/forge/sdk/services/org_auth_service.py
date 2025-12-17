@@ -148,7 +148,19 @@ async def get_current_user_id_with_authentication(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid credentials",
         )
-    return await _authenticate_user_helper(authorization)
+    token = authorization.split(" ")[1]
+    if not app.authenticate_user_function:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid user authentication method",
+        )
+    user_id = await app.authenticate_user_function(token)
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid credentials",
+        )
+    return user_id
 
 
 async def _authenticate_user_helper(authorization: str) -> str:
