@@ -95,7 +95,26 @@ async def get_current_org_with_authentication(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid credentials",
         )
-    return await _authenticate_helper(authorization)
+    token = authorization.split(" ")[1]
+    if not app.authentication_function:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid authentication method",
+        )
+    organization = await app.authentication_function(token)
+    if not organization:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid credentials",
+        )
+
+    # set organization_id in skyvern context and log context
+    context = skyvern_context.current()
+    if context:
+        context.organization_id = organization.organization_id
+        context.organization_name = organization.organization_name
+
+    return organization
 
 
 async def _authenticate_helper(authorization: str) -> Organization:
