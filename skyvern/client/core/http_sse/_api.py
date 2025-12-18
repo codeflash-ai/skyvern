@@ -24,11 +24,18 @@ class EventSource:
     def _get_charset(self) -> str:
         """Extract charset from Content-Type header, fallback to UTF-8."""
         content_type = self._response.headers.get("content-type", "")
-
-        # Parse charset parameter using regex
-        charset_match = re.search(r"charset=([^;\s]+)", content_type, re.IGNORECASE)
-        if charset_match:
-            charset = charset_match.group(1).strip("\"'")
+        # Fast path: look for the typical charset position without regex unless absolutely needed
+        idx = content_type.lower().find("charset=")
+        if idx != -1:
+            # Find start of charset value
+            start = idx + 8
+            # Find end (stop at ; or whitespace or end of string)
+            end = len(content_type)
+            for i in range(start, end):
+                if content_type[i] in "; \t\r\n":
+                    end = i
+                    break
+            charset = content_type[start:end].strip("\"'")
             # Validate that it's a known encoding
             try:
                 # Test if the charset is valid by trying to encode/decode
@@ -37,7 +44,16 @@ class EventSource:
             except (LookupError, UnicodeError):
                 # If charset is invalid, fall back to UTF-8
                 pass
-
+        # Fallback: use regex only if fast path fails
+        else:
+            charset_match = re.search(r"charset=([^;\s]+)", content_type, re.IGNORECASE)
+            if charset_match:
+                charset = charset_match.group(1).strip("\"'")
+                try:
+                    "test".encode(charset).decode(charset)
+                    return charset
+                except (LookupError, UnicodeError):
+                    pass
         # Default to UTF-8 if no charset specified or invalid charset
         return "utf-8"
 
