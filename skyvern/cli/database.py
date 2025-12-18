@@ -26,13 +26,8 @@ def run_command(command: str, check: bool = True) -> tuple[Optional[str], Option
 
 def is_postgres_running() -> bool:
     if command_exists("pg_isready"):
-        with console.status("[bold green]Checking PostgreSQL status...") as status:
-            result, _ = run_command("pg_isready")
-            if result is not None and "accepting connections" in result:
-                status.stop()
-                return True
-            status.stop()
-            return False
+        result, _ = run_command("pg_isready")
+        return result is not None and "accepting connections" in result
     return False
 
 
@@ -118,11 +113,7 @@ def setup_postgresql(no_postgres: bool = False) -> None:
                 run_command("docker start postgresql-container")
             console.print("✅ [green]Existing PostgreSQL container started.[/green]")
 
-        with Progress(
-            SpinnerColumn(), TextColumn("[progress.description]{task.description}"), transient=True, console=console
-        ) as progress:
-            progress.add_task("[bold blue]Waiting for PostgreSQL to become ready...", total=None)
-            time.sleep(20)
+        wait_for_postgres_container()
 
         console.print("✅ [green]PostgreSQL container ready.[/green]")
 
@@ -148,3 +139,18 @@ def setup_postgresql(no_postgres: bool = False) -> None:
             console.print("🚀 [bold green]Creating database...[/bold green]")
             run_command("docker exec postgresql-container createdb -U postgres skyvern -O skyvern")
             console.print("✅ [green]Database and user created successfully.[/green]")
+
+
+
+
+def wait_for_postgres_container() -> None:
+    """Wait for PostgreSQL container to become ready."""
+    with Progress(
+        SpinnerColumn(), TextColumn("[progress.description]{task.description}"), transient=True, console=console
+    ) as progress:
+        progress.add_task("[bold blue]Waiting for PostgreSQL to become ready...", total=None)
+        for _ in range(20):
+            output, code = run_command("docker exec postgresql-container pg_isready", check=False)
+            if code == 0 and output and "accepting connections" in output:
+                return
+            time.sleep(1)
