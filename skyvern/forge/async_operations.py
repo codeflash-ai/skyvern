@@ -83,11 +83,11 @@ class AsyncOperationPool:
             self._add_operation(task_id, operation)
 
     def _get_operation(self, task_id: str, agent_phase: AgentPhase) -> AsyncOperation | None:
-        # Direct dictionary access and exception handling to minimize overhead
-        try:
-            return self._operations[task_id][agent_phase]
-        except KeyError:
+        # Avoid double exception overhead by nested .get lookups
+        phase_ops = self._operations.get(task_id)
+        if phase_ops is None:
             return None
+        return phase_ops.get(agent_phase)
 
     def _remove_operations(self, task_id: str) -> None:
         if task_id in self._operations:
