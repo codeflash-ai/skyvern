@@ -12,7 +12,7 @@ def prepend_scheme_and_validate_url(url: str) -> str:
     if not url:
         return url
 
-    parsed_url = urlparse(url=url)
+    parsed_url = urlsplit(url)
     if parsed_url.scheme and parsed_url.scheme not in ["http", "https"]:
         raise InvalidUrl(url=url)
 
