@@ -127,7 +127,12 @@ class SkyvernLocator:
 
     def locator(self, selector: str, **kwargs: Any) -> "SkyvernLocator":
         """Find a descendant element."""
-        return SkyvernLocator(self._locator.locator(selector, **kwargs))
+        # Micro-optimization: Avoid unnecessary allocation of kwargs dict if none passed
+        if not kwargs:
+            new_locator = self._locator.locator(selector)
+        else:
+            new_locator = self._locator.locator(selector, **kwargs)
+        return SkyvernLocator(new_locator)
 
     def get_by_label(self, text: str | Pattern[str], **kwargs: Any) -> "SkyvernLocator":
         """Find an input element by its associated label text."""
