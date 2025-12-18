@@ -97,7 +97,7 @@ class AsyncOperationPool:
         """
         Get all the running/pending aio tasks for the given task_id
         """
-        return [aio_task for aio_task in self._aio_tasks.get(task_id, {}).values() if is_aio_task_running(aio_task)]
+        return [aio_task for aio_task in self._aio_tasks.get(task_id, {}).values() if not aio_task.done() and not aio_task.cancelled()]
 
     def get_aio_task(self, task_id: str, operation_type: str) -> asyncio.Task | None:
         return self._aio_tasks.get(task_id, {}).get(operation_type, None)
