@@ -11,7 +11,9 @@ from .console import console
 
 
 def command_exists(command: str) -> bool:
-    return shutil.which(command) is not None
+    # Minimize attribute lookup by localizing 'which'
+    which = shutil.which
+    return which(command) is not None
 
 
 def run_command(command: str, check: bool = True) -> tuple[Optional[str], Optional[int]]:
