@@ -24,24 +24,28 @@ def traverse_query_dict(dict_flat: Dict[str, Any], key_prefix: Optional[str] = N
 
 
 def single_query_encoder(query_key: str, query_value: Any) -> List[Tuple[str, Any]]:
-    if isinstance(query_value, pydantic.BaseModel) or isinstance(query_value, dict):
-        if isinstance(query_value, pydantic.BaseModel):
-            obj_dict = query_value.dict(by_alias=True)
-        else:
-            obj_dict = query_value
-        return traverse_query_dict(obj_dict, query_key)
-    elif isinstance(query_value, list):
-        encoded_values: List[Tuple[str, Any]] = []
-        for value in query_value:
-            if isinstance(value, pydantic.BaseModel) or isinstance(value, dict):
-                if isinstance(value, pydantic.BaseModel):
-                    obj_dict = value.dict(by_alias=True)
-                elif isinstance(value, dict):
-                    obj_dict = value
+    # Use local variables for fast lookup of often-used functions
+    isinstance_ = isinstance
+    BaseModel = pydantic.BaseModel
 
-                encoded_values.extend(single_query_encoder(query_key, obj_dict))
+    # Single isinstance() check instead of two, for pydantic.BaseModel | dict scenario
+    if isinstance_(query_value, BaseModel):
+        obj_dict = query_value.dict(by_alias=True)
+        return traverse_query_dict(obj_dict, query_key)
+    elif isinstance_(query_value, dict):
+        return traverse_query_dict(query_value, query_key)
+    elif isinstance_(query_value, list):
+        encoded_values: List[Tuple[str, Any]] = []
+        append = encoded_values.append
+        extend = encoded_values.extend
+        for value in query_value:
+            if isinstance_(value, BaseModel):
+                obj_dict = value.dict(by_alias=True)
+                extend(traverse_query_dict(obj_dict, query_key))
+            elif isinstance_(value, dict):
+                extend(traverse_query_dict(value, query_key))
             else:
-                encoded_values.append((query_key, value))
+                append((query_key, value))
 
         return encoded_values
 
@@ -52,7 +56,8 @@ def encode_query(query: Optional[Dict[str, Any]]) -> Optional[List[Tuple[str, An
     if query is None:
         return None
 
-    encoded_query = []
+    encoded_query: List[Tuple[str, Any]] = []
+    extend = encoded_query.extend
     for k, v in query.items():
-        encoded_query.extend(single_query_encoder(k, v))
+        extend(single_query_encoder(k, v))
     return encoded_query
