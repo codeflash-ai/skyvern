@@ -95,11 +95,8 @@ def remove_omit_from_dict(
 ) -> typing.Dict[str, typing.Any]:
     if omit is None:
         return original
-    new: typing.Dict[str, typing.Any] = {}
-    for key, value in original.items():
-        if value is not omit:
-            new[key] = value
-    return new
+    # optimized with dict comprehension
+    return {key: value for key, value in original.items() if value is not omit}
 
 
 def maybe_filter_request_body(
@@ -108,22 +105,18 @@ def maybe_filter_request_body(
     omit: typing.Optional[typing.Any],
 ) -> typing.Optional[typing.Any]:
     if data is None:
-        return (
-            jsonable_encoder(request_options.get("additional_body_parameters", {})) or {}
-            if request_options is not None
-            else None
-        )
+        if request_options is not None:
+            return jsonable_encoder(request_options.get("additional_body_parameters", {})) or {}
+        else:
+            return None
     elif not isinstance(data, typing.Mapping):
         data_content = jsonable_encoder(data)
     else:
-        data_content = {
-            **(jsonable_encoder(remove_omit_from_dict(data, omit))),  # type: ignore
-            **(
-                jsonable_encoder(request_options.get("additional_body_parameters", {})) or {}
-                if request_options is not None
-                else {}
-            ),
-        }
+        merged_dict = dict(jsonable_encoder(remove_omit_from_dict(data, omit)))  # type: ignore
+        if request_options is not None:
+            additional = jsonable_encoder(request_options.get("additional_body_parameters", {})) or {}
+            merged_dict.update(additional)
+        data_content = merged_dict
     return data_content
 
 
